@@ -100,6 +100,7 @@ export async function createOrder(input: CreateOrderInput) {
     }
   }
 
+  await settings.all() // refresh cache so the synchronous prefix getter is current
   const number = orderNumber(settings.orderPrefix)
 
   const order = await db.$transaction(async (tx) => {

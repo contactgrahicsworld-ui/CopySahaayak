@@ -512,3 +512,20 @@ model StoredObject {
 
   @@schema("csp")
 }
+
+// ============ PASSWORD RESET OTP (app-issued, email transport agnostic) ============
+// Used when the deployment sends email through Resend (RESEND_API_KEY) instead of
+// the Supabase built-in mailer. Codes are stored hashed, expire in 10 minutes and
+// are single-use with a bounded number of verification attempts.
+model PasswordResetOtp {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+  @@schema("csp")
+}

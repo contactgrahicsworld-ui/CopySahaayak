@@ -71,3 +71,4 @@ nohup.out
 /connector/PhotocopyShopConnector/bin/
 /connector/PhotocopyShopConnector/obj/
 /connector/installer/PhotocopyShopConnector-Setup.exe
+tool-results/

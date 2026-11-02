@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, Store, BadgeCheck, Layers, ScrollText, Settings, LogOut, Loader2,
-  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X,
+  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users,
 } from 'lucide-react'
 
 export function SuperDashboard({ user }: { user: { name: string; email: string } }) {
@@ -45,6 +45,7 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
           <TabsList className="w-full h-auto flex-wrap justify-start gap-1 mb-4">
             <TabsTrigger value="overview"><LayoutDashboard className="h-4 w-4 mr-1" aria-hidden /> Overview</TabsTrigger>
             <TabsTrigger value="shops"><Store className="h-4 w-4 mr-1" aria-hidden /> Shops</TabsTrigger>
+            <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" aria-hidden /> Users</TabsTrigger>
             <TabsTrigger value="subs"><BadgeCheck className="h-4 w-4 mr-1" aria-hidden /> Subscriptions</TabsTrigger>
             <TabsTrigger value="plans"><Layers className="h-4 w-4 mr-1" aria-hidden /> Plans</TabsTrigger>
             <TabsTrigger value="audit"><ScrollText className="h-4 w-4 mr-1" aria-hidden /> Audit log</TabsTrigger>
@@ -52,6 +53,7 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
           </TabsList>
           <TabsContent value="overview"><OverviewTab /></TabsContent>
           <TabsContent value="shops"><ShopsTab /></TabsContent>
+          <TabsContent value="users"><UsersTab /></TabsContent>
           <TabsContent value="subs"><SubsTab /></TabsContent>
           <TabsContent value="plans"><PlansTab /></TabsContent>
           <TabsContent value="audit"><AuditTab /></TabsContent>
@@ -281,6 +283,113 @@ function ShopsTab() {
           <DialogHeader><DialogTitle>Shop created — share these credentials</DialogTitle></DialogHeader>
           <p className="text-sm">Owner login: <strong>{newCreds?.email}</strong><br />Password: <strong>{newCreds?.password}</strong></p>
           <DialogFooter><Button onClick={() => setNewCreds(null)}>Done</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+interface UserRow {
+  id: string
+  email: string
+  name: string
+  role: string
+  isActive: boolean
+  createdAt: string
+  shop: { id: string; name: string; slug: string } | null
+}
+
+function UsersTab() {
+  const { toast } = useToast()
+  const [users, setUsers] = useState<UserRow[]>([])
+  const [q, setQ] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [reset, setReset] = useState<UserRow | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/super/users?q=${encodeURIComponent(q)}`, { cache: 'no-store' })
+    const data = await res.json()
+    if (res.ok) setUsers(data.users)
+    setLoading(false)
+  }, [q])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function submitReset() {
+    if (!reset) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/super/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: reset.id, newPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast({ title: `Password reset for ${reset.email}`, description: 'All their sessions were signed out.' })
+      setReset(null)
+      setNewPassword('')
+    } catch (err) {
+      toast({ title: 'Reset failed', description: err instanceof Error ? err.message : '', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 items-center">
+        <Input placeholder="Search users by email or name" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
+        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4" aria-hidden /></Button>
+      </div>
+      {loading ? (
+        <CenterSpinner />
+      ) : (
+        <div className="space-y-2">
+          {users.map((u) => (
+            <Card key={u.id}>
+              <CardContent className="py-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm">
+                    {u.name} <span className="text-muted-foreground font-normal">· {u.email}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {u.role}{u.shop ? ` · ${u.shop.name} (/s/${u.shop.slug})` : ''} · joined {new Date(u.createdAt).toLocaleDateString('en-IN')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={u.isActive ? 'default' : 'destructive'}>{u.isActive ? 'ACTIVE' : 'DISABLED'}</Badge>
+                  <Button size="sm" variant="outline" onClick={() => { setReset(u); setNewPassword('') }}><KeyRound className="h-3.5 w-3.5 mr-1" aria-hidden />Reset password</Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No users found.</p>}
+        </div>
+      )}
+
+      <Dialog open={!!reset} onOpenChange={(v) => !v && setReset(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset password — {reset?.email}</DialogTitle>
+            <DialogDescription>
+              Set a new password for this user. They will be signed out everywhere. Minimum 8 characters with a letter and a digit.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label>New password</Label>
+            <Input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="min 8 chars, 1 letter + 1 digit" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReset(null)}>Cancel</Button>
+            <Button onClick={submitReset} disabled={saving || newPassword.length < 8}>
+              {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Reset password
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

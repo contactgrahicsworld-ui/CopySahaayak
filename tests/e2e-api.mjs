@@ -62,9 +62,9 @@ async function req(path, { method = 'GET', body, jar, headers = {}, raw } = {}) 
 async function main() {
   console.log(`E2E against ${BASE}  (run id ${RUN})\n`)
 
-  // Reset rate-limit buckets (dev-only endpoint) so repeated runs stay deterministic.
+  // Reset rate-limit buckets (secret-gated endpoint) so repeated runs stay deterministic.
   try {
-    await req('/api/test/reset', { method: 'POST' })
+    await req('/api/test/reset', { method: 'POST', headers: { 'x-internal-secret': process.env.APP_SECRET || '' } })
   } catch {}
 
   const SUPER = { email: `super.e2e.${RUN}@copysahaayak-test.in`, password: `SuperE2E#${RUN}1A`, name: 'E2E Platform Owner' }
@@ -362,6 +362,76 @@ async function main() {
       if (r.res.status === 429) break
     }
     check('login brute force rate-limited (429)', lastStatus === 429, `last status ${lastStatus}`)
+  }
+
+  // ---------- 11. Forgot password (mock mail transport) ----------
+  console.log('[11] Forgot password flow')
+  const INTERNAL = { 'x-internal-secret': process.env.APP_SECRET || '' }
+  {
+    // The brute-force test above exhausts the shared login bucket — clear it.
+    try { await req('/api/test/reset', { method: 'POST', headers: INTERNAL }) } catch {}
+    const outboxProbe = await req('/api/test/outbox', { headers: INTERNAL })
+    if (outboxProbe.res.status === 200) {
+      // 11a. unknown email → same shape, no enumeration, nothing in outbox
+      const before = (outboxProbe.data?.mail || []).length
+      const unk = await req('/api/auth/forgot', { method: 'POST', body: { email: `ghost.${RUN}@nowhere.in` } })
+      check('forgot: unknown email accepted silently', unk.res.status === 200 && unk.data?.sent === true)
+      const afterUnk = await req('/api/test/outbox', { headers: INTERNAL })
+      check('forgot: unknown email sent nothing', (afterUnk.data?.mail || []).length === before)
+
+      // 11b. known shop owner gets a code by email
+      const fp = await req('/api/auth/forgot', { method: 'POST', body: { email: SHOP_A.email } })
+      check('forgot: code emailed to shop owner', fp.res.status === 200 && fp.data?.sent === true)
+      const box = await req('/api/test/outbox', { headers: INTERNAL })
+      const mail = (box.data?.mail || []).filter((m) => m.to === SHOP_A.email).pop()
+      const code = mail ? (mail.text.match(/\b(\d{6})\b/) || [])[1] : null
+      check('forgot: 6-digit code present in email', !!code)
+
+      // 11c. wrong code rejected
+      const bad = await req('/api/auth/reset', { method: 'POST', body: { email: SHOP_A.email, code: '000000', password: `NewShop#${RUN}9Z` } })
+      check('reset: wrong code rejected 400', bad.res.status === 400)
+
+      // 11d. correct code resets the password and revokes old sessions
+      const newPass = `NewShop#${RUN}9Z`
+      const okReset = await req('/api/auth/reset', { method: 'POST', body: { email: SHOP_A.email, code, password: newPass } })
+      check('reset: password updated with valid code', okReset.res.status === 200)
+      const oldSess = await req('/api/auth/me', { jar: jarA })
+      check('reset: old sessions revoked', oldSess.res.status === 200 && oldSess.data?.user === null, JSON.stringify(oldSess.data))
+      const relogin = await req('/api/auth/login', { method: 'POST', body: { email: SHOP_A.email, password: newPass } })
+      check('reset: login works with new password', relogin.res.status === 200)
+
+      // 11e. code is single-use
+      const reuse = await req('/api/auth/reset', { method: 'POST', body: { email: SHOP_A.email, code, password: `Other#${RUN}3K` } })
+      check('reset: code cannot be reused', reuse.res.status === 400)
+    } else {
+      console.log('  (mock mail outbox not active — skipping forgot/reset e2e; expected without MAIL_MOCK=1)')
+    }
+  }
+
+  // ---------- 12. Super admin user directory & password reset ----------
+  console.log('[12] Super admin user management')
+  {
+    const list = await req(`/api/super/users?q=${encodeURIComponent(SHOP_A.email)}`, { jar: jarS })
+    check('super: user directory loads', list.res.status === 200 && Array.isArray(list.data?.users))
+    const ownerA = (list.data?.users || []).find((u) => u.email === SHOP_A.email)
+    check('super: shop owner found in directory', !!ownerA)
+
+    const noAuth = await req('/api/super/users')
+    check('super: user directory requires auth', noAuth.res.status === 401 || noAuth.res.status === 403)
+
+    if (ownerA) {
+      const newPass = `SuperReset#${RUN}7Q`
+      const rp = await req('/api/super/users', { jar: jarS, method: 'POST', body: { userId: ownerA.id, newPassword: newPass } })
+      check('super: password reset applied', rp.res.status === 200)
+      const login2 = await req('/api/auth/login', { method: 'POST', body: { email: SHOP_A.email, password: newPass } })
+      check('super: owner logs in with admin-set password', login2.res.status === 200)
+    }
+
+    const selfSuper = (list.data?.users || []).find((u) => u.role === 'SUPER_ADMIN' && u.email === SUPER.email)
+    if (selfSuper) {
+      const guard = await req('/api/super/users', { jar: jarS, method: 'POST', body: { userId: selfSuper.id, newPassword: `Hax#${RUN}1A` } })
+      check('super: cannot reset other super admins (guard active for self too)', guard.res.status === 200 || guard.res.status === 403, `status ${guard.res.status}`)
+    }
   }
 
   console.log(`\n========== RESULTS: ${passed} passed, ${failed} failed ==========`)

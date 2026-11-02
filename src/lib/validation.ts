@@ -120,6 +120,11 @@ export const newPasswordSchema = z
   .regex(/[A-Za-z]/, 'Include at least one letter')
   .regex(/[0-9]/, 'Include at least one digit')
 
+export const superResetPasswordSchema = z.object({
+  userId: z.string().trim().min(10).max(60),
+  newPassword: newPasswordSchema,
+})
+
 export const setupSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email().max(120),

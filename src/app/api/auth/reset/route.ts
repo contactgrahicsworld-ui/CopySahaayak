@@ -1,10 +1,12 @@
-// Forgot password step 2: verify the emailed 6-digit OTP with Supabase, then
-// update our app password (bcrypt) and revoke every existing session.
+// Forgot password step 2: verify the emailed 6-digit code, then update the app
+// password (bcrypt) and revoke every existing session. Verification path matches
+// the transport used at step 1 (Supabase verify API or our hashed OTP table).
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { resetPasswordSchema } from '@/lib/validation'
 import { bcryptHash } from '@/lib/security'
 import { verifyEmailOtp, adminFindUserByEmail, adminUpdateUserPassword } from '@/lib/supabase'
+import { mailTransport, hashOtp } from '@/lib/mailer'
 import { RATE_LIMITS } from '@/lib/rate-limit'
 import { getClientIp } from '@/lib/security'
 import { audit } from '@/lib/audit'
@@ -14,6 +16,26 @@ export const dynamic = 'force-dynamic'
 
 const BAD_CODE = 'Invalid or expired code. Request a new one.'
 
+async function verifySupabaseOtp(email: string, code: string): Promise<boolean> {
+  try {
+    return await verifyEmailOtp(email, code)
+  } catch {
+    throw new Error('supabase_down')
+  }
+}
+
+async function verifyAppOtp(email: string, code: string): Promise<boolean> {
+  const otp = await db.passwordResetOtp.findFirst({
+    where: { email, consumedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!otp) return false
+  if (otp.attempts >= 5) return false
+  const ok = otp.codeHash === hashOtp(code)
+  await db.passwordResetOtp.update({ where: { id: otp.id }, data: { attempts: { increment: 1 }, consumedAt: ok ? new Date() : undefined } })
+  return ok
+}
+
 export async function POST(req: Request) {
   return handleRoute(
     req,
@@ -22,15 +44,24 @@ export async function POST(req: Request) {
       const body = resetPasswordSchema.parse(await req.json())
       const email = body.email.toLowerCase()
 
-      // Server-side proof the code is real — Supabase checks it, we never trust the client.
+      // Server-side proof the code is real — we never trust the client.
       let codeOk = false
-      let supabaseDown = false
-      try {
-        codeOk = await verifyEmailOtp(email, body.code)
-      } catch {
-        supabaseDown = true
+      let serviceDown = false
+      if (mailTransport === 'supabase') {
+        try {
+          codeOk = await verifySupabaseOtp(email, body.code)
+        } catch {
+          serviceDown = true
+        }
+      } else if (mailTransport === 'resend' || mailTransport === 'mock') {
+        codeOk = await verifyAppOtp(email, body.code)
+      } else {
+        return jsonError(
+          503,
+          'Password reset email is not configured on this deployment yet. Ask the platform admin to set RESEND_API_KEY (or Supabase keys), or use the Super Admin password reset in the dashboard.'
+        )
       }
-      if (supabaseDown) return jsonError(502, 'Password reset is temporarily unavailable. Please try again in a few minutes.')
+      if (serviceDown) return jsonError(502, 'Password reset is temporarily unavailable. Please try again in a few minutes.')
       if (!codeOk) return jsonError(400, BAD_CODE)
 
       const user = await db.user.findUnique({ where: { email } })
@@ -40,6 +71,8 @@ export async function POST(req: Request) {
       await db.user.update({ where: { id: user.id }, data: { passwordHash } })
       // Invalidate every existing session of this user
       await db.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } })
+      // Any app-issued codes are now worthless
+      await db.passwordResetOtp.updateMany({ where: { email, consumedAt: null }, data: { consumedAt: new Date() } })
 
       // Keep the Supabase mirror in sync (best effort — it only exists for email OTP)
       const mirror = await adminFindUserByEmail(email).catch(() => null)

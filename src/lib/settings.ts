@@ -8,9 +8,15 @@ const TTL = 30_000
 export const settings = {
   async all(): Promise<Record<string, string>> {
     if (cache && Date.now() - cacheAt < TTL) return cache
-    const rows = await db.platformSetting.findMany()
-    cache = Object.fromEntries(rows.map((r) => [r.key, r.value]))
-    cacheAt = Date.now()
+    try {
+      const rows = await db.platformSetting.findMany()
+      cache = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+      cacheAt = Date.now()
+    } catch {
+      // Unreachable DB (e.g. cold start / build-time evaluation) — fall back to
+      // defaults rather than crashing the request; retried on the next call.
+      cache = cache || {}
+    }
     return cache
   },
   get(key: string, fallback = ''): string {
@@ -23,6 +29,3 @@ export const settings = {
     cache = null
   },
 }
-
-// Eager-load once per process so synchronous `get` works on first request
-void settings.all()
