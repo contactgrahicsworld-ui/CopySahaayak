@@ -1,0 +1,514 @@
+// Photocopy Shop Automation SaaS — multi-tenant schema (PostgreSQL / Supabase)
+// Lives in the dedicated `csp` schema; see docs/security.md for RLS notes
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["csp"]
+}
+
+// NOTE: enum-like fields are String and validated with zod schemas in
+// src/lib/validation.ts. Everything lives in the dedicated `csp` Postgres
+// schema so other apps sharing the same Supabase project are untouched.
+
+// ============ PLATFORM ============
+
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  @@schema("csp")
+}
+
+model Plan {
+  id                String   @id @default(cuid())
+  code              String   @unique // FREE | STARTER | PROFESSIONAL | ENTERPRISE
+  name              String
+  pricePaise        Int      @default(0)
+  durationDays      Int      @default(30)
+  maxOrdersMonth    Int? // null = unlimited
+  maxStorageMb      Int?
+  maxDevices        Int?
+  maxStaff          Int?
+  featuresJson      String   @default("[]")
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  subscriptions     Subscription[]
+  subscriptionPayments SubscriptionPayment[]
+  @@schema("csp")
+}
+
+// ============ USERS / AUTH ============
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         String // SUPER_ADMIN | SHOP_ADMIN | SHOP_STAFF
+  shopId       String?
+  shop         Shop?     @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  memberships  ShopMember[]
+  auditLogs    AuditLog[]
+  verifiedPayments       Payment[]
+  verifiedSubPayments    SubscriptionPayment[]
+
+  @@index([role])
+  @@schema("csp")
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // sha256 of opaque token
+  ip        String?
+  userAgent String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@schema("csp")
+}
+
+model ShopMember {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String // OWNER | MANAGER | STAFF
+  createdAt DateTime @default(now())
+
+  @@unique([shopId, userId])
+  @@index([userId])
+  @@schema("csp")
+}
+
+// ============ SHOP (TENANT) ============
+
+model Shop {
+  id           String   @id @default(cuid())
+  slug         String   @unique // public URL: /s/{slug}
+  name         String
+  ownerName    String?
+  phone        String?
+  address      String?
+  logoPath     String?
+  upiVpa       String? // UPI ID for order payments
+  upiPayeeName String?
+  isActive     Boolean  @default(true)
+  suspendedReason String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users             User[]
+  members           ShopMember[]
+  pricingRules      PricingRule[]
+  customerSessions  CustomerSession[]
+  documents         Document[]
+  orders            Order[]
+  payments          Payment[]
+  printers          Printer[]
+  devices           Device[]
+  routingRules      RoutingRule[]
+  printJobs         PrintJob[]
+  printEvents       PrintEvent[]
+  subscription      Subscription?
+  subscriptionPayments SubscriptionPayment[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+
+  @@index([isActive])
+  @@schema("csp")
+}
+
+// ============ BILLING / SUBSCRIPTIONS ============
+
+model Subscription {
+  id        String    @id @default(cuid())
+  shopId    String    @unique
+  shop      Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      Plan      @relation(fields: [planId], references: [id])
+  status    String // ACTIVE | PENDING_VERIFICATION | EXPIRED | CANCELLED
+  startsAt  DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  subscriptionPayments SubscriptionPayment[]
+
+  @@index([status])
+  @@schema("csp")
+}
+
+model SubscriptionPayment {
+  id               String    @id @default(cuid())
+  shopId           String
+  shop             Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  planId           String
+  plan             Plan      @relation(fields: [planId], references: [id])
+  subscriptionId   String?
+  subscription     Subscription? @relation(fields: [subscriptionId], references: [id])
+  amountPaise      Int
+  utr              String
+  payerName        String?
+  screenshotPath   String?
+  status           String // PENDING | VERIFIED | REJECTED
+  rejectionReason  String?
+  verifiedByUserId String?
+  verifiedBy       User?     @relation(fields: [verifiedByUserId], references: [id])
+  verifiedAt       DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+
+  @@index([shopId])
+  @@index([status])
+  @@index([planId])
+  @@schema("csp")
+}
+
+// ============ PRICING ============
+
+model PricingRule {
+  id               String   @id @default(cuid())
+  shopId           String
+  shop             Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  paperSize        String // A4 | A3 | A5 | LEGAL
+  colorMode        String // BW | COLOR
+  singleSidedPaise Int // price per printed side (simplex)
+  duplexPaise      Int // price per printed side when duplex
+  isActive         Boolean  @default(true)
+  updatedAt        DateTime @updatedAt
+
+  @@unique([shopId, paperSize, colorMode])
+  @@index([shopId])
+  @@schema("csp")
+}
+
+// ============ CUSTOMER (GUEST) SESSIONS ============
+
+model CustomerSession {
+  id         String   @id @default(cuid())
+  shopId     String
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  name       String?
+  phone      String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  documents  Document[]
+  orders     Order[]
+
+  @@index([shopId])
+  @@schema("csp")
+}
+
+// ============ ORDERS ============
+
+model Document {
+  id                String   @id @default(cuid())
+  shopId            String
+  shop              Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  customerSessionId String?
+  customerSession   CustomerSession? @relation(fields: [customerSessionId], references: [id], onDelete: SetNull)
+  orderId           String?
+  order             Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  originalName      String
+  storedPath        String // private storage path (never exposed)
+  mimeType          String
+  sizeBytes         Int
+  pageCount         Int // server-verified
+  checksum          String // sha256
+  status            String // READY | REJECTED | EXPIRED
+  rejectionReason   String?
+  createdAt         DateTime @default(now())
+
+  orderItems OrderItem[]
+  printJobs  PrintJob[]
+
+  @@index([shopId])
+  @@index([orderId])
+  @@index([customerSessionId])
+  @@schema("csp")
+}
+
+model Order {
+  id                String    @id @default(cuid())
+  shopId            String
+  shop              Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderNumber       String    @unique // human readable e.g. PC-2602-A1B2C
+  customerSessionId String?
+  customerSession   CustomerSession? @relation(fields: [customerSessionId], references: [id], onDelete: SetNull)
+  customerName      String?
+  customerPhone     String?
+  status            String // PENDING_PAYMENT | AWAITING_VERIFICATION | CONFIRMED | COMPLETED | CANCELLED | REJECTED
+  totalPaise        Int
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  confirmedAt       DateTime?
+  completedAt       DateTime?
+
+  items     OrderItem[]
+  documents Document[]
+  payment   Payment?
+  printJobs PrintJob[]
+
+  @@index([shopId, status])
+  @@index([shopId, createdAt])
+  @@index([customerSessionId])
+  @@schema("csp")
+}
+
+model OrderItem {
+  id               String   @id @default(cuid())
+  orderId          String
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shopId           String
+  documentId       String
+  document         Document @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  colorMode        String // BW | COLOR
+  paperSize        String // A4 | A3 | A5 | LEGAL
+  duplex           Boolean  @default(false)
+  copies           Int      @default(1)
+  pageFrom         Int?
+  pageTo           Int?
+  pageCount        Int // server-verified number of sides to print
+  unitPricePaise   Int // per side at time of order
+  totalPaise       Int
+  createdAt        DateTime @default(now())
+
+  printJobs PrintJob[]
+
+  @@index([orderId])
+  @@index([shopId])
+  @@schema("csp")
+}
+
+// ============ PAYMENTS (UPI, manual verification) ============
+
+model Payment {
+  id             String    @id @default(cuid())
+  orderId        String    @unique
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shopId         String
+  shop           Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  method         String    @default("UPI")
+  amountPaise    Int
+  upiVpa         String // snapshot of shop UPI at order time
+  payeeName      String?
+  qrPayload      String // upi:// deep link embedded in QR
+  txnRef         String // reference passed in QR (orderNumber)
+  utr            String?
+  payerName      String?
+  screenshotPath String?
+  status         String // PENDING | SUBMITTED | VERIFIED | REJECTED
+  rejectionReason String?
+  submittedAt    DateTime?
+  verifiedByUserId String?
+  verifiedBy     User?     @relation(fields: [verifiedByUserId], references: [id])
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  verifications PaymentVerification[]
+
+  @@index([shopId, status])
+  @@schema("csp")
+}
+
+model PaymentVerification {
+  id          String   @id @default(cuid())
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  action      String // SUBMIT | VERIFY | REJECT
+  adminUserId String?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([paymentId])
+  @@schema("csp")
+}
+
+// ============ PRINTERS / DEVICES ============
+
+model Device {
+  id               String    @id @default(cuid())
+  shopId           String
+  shop             Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name             String // friendly name
+  machineName      String?
+  appVersion       String?
+  pairingCode      String?
+  pairingExpiresAt DateTime?
+  tokenHash        String?   @unique // sha256 of device token
+  status           String // PENDING | ACTIVE | REVOKED
+  lastSeenAt       DateTime?
+  registeredAt     DateTime?
+  createdAt        DateTime  @default(now())
+
+  printers   Printer[]
+  printJobs  PrintJob[]
+  printEvents PrintEvent[]
+
+  @@index([shopId])
+  @@index([status])
+  @@schema("csp")
+}
+
+model Printer {
+  id          String    @id @default(cuid())
+  shopId      String
+  shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  deviceId    String?
+  device      Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  windowsName String // exact Windows printer name
+  displayName String?
+  colorMode   String // BW | COLOR | ANY
+  paperSizesJson String @default("[\"A4\"]")
+  isDefault   Boolean   @default(false)
+  status      String    @default("OFFLINE") // ONLINE | OFFLINE
+  lastSeenAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  routingRules RoutingRule[]
+  printJobs    PrintJob[]
+
+  @@unique([shopId, windowsName])
+  @@index([shopId])
+  @@schema("csp")
+}
+
+model RoutingRule {
+  id        String  @id @default(cuid())
+  shopId    String
+  shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  colorMode String // BW | COLOR
+  paperSize String? // null = any
+  printerId String
+  printer   Printer @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  priority  Int     @default(0)
+  isActive  Boolean @default(true)
+
+  @@index([shopId])
+  @@schema("csp")
+}
+
+model PrintJob {
+  id            String    @id @default(cuid())
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId   String
+  orderItem     OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  documentId    String
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  printerId     String?
+  printer       Printer?  @relation(fields: [printerId], references: [id], onDelete: SetNull)
+  deviceId      String?
+  device        Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  status        String @default("QUEUED") // QUEUED | CLAIMED | SPOOLING | COMPLETED | FAILED | CANCELLED
+  attempts      Int    @default(0)
+  maxAttempts   Int    @default(3)
+  claimedAt     DateTime?
+  leaseUntil    DateTime? // claim lease expiry
+  claimedByDeviceId String?
+  completedAt   DateTime?
+  lastError     String?
+  spoolDocumentName String @unique // "PCS-<shortid>" matched against Windows spooler
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  events PrintEvent[]
+
+  @@index([shopId, status])
+  @@index([deviceId, status])
+  @@index([orderId])
+  @@schema("csp")
+}
+
+model PrintEvent {
+  id         String   @id @default(cuid())
+  printJobId String
+  printJob   PrintJob @relation(fields: [printJobId], references: [id], onDelete: Cascade)
+  shopId     String
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  deviceId   String?
+  device     Device?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  status     String
+  message    String?
+  createdAt  DateTime @default(now())
+
+  @@index([printJobId])
+  @@index([shopId])
+  @@schema("csp")
+}
+
+// ============ AUDIT / NOTIFICATIONS ============
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  shopId    String?
+  shop      Shop?    @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actorType String // USER | DEVICE | CUSTOMER | SYSTEM
+  actorId   String?
+  action    String // e.g. ORDER_VERIFY, DEVICE_REVOKE, LOGIN
+  entity    String?
+  entityId  String?
+  metaJson  String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([shopId])
+  @@index([createdAt])
+  @@index([action])
+  @@schema("csp")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  shopId    String?
+  shop      Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  audience  String // SHOP | SUPER
+  title     String
+  body      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([audience])
+  @@index([shopId])
+  @@schema("csp")
+}
+
+// ============ FILE STORAGE (database backend) ============
+
+// Binary storage for uploads when STORAGE_DRIVER=database. Supabase Storage is
+// the alternative backend; both are private and only reachable via signed URLs.
+model StoredObject {
+  key       String   @id
+  mimeType  String
+  bytes     Bytes
+  sizeBytes Int
+  createdAt DateTime @default(now())
+
+  @@schema("csp")
+}
