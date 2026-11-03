@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { HttpError } from '@/lib/auth'
 import { getClientIp, sameOriginOk } from '@/lib/security'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimitShared } from '@/lib/rate-limit'
 
 export function jsonOk<T>(data: T, init?: ResponseInit) {
   return NextResponse.json(data as object, init)
@@ -29,7 +29,7 @@ export async function handleRoute(
     }
     if (options.rateLimit) {
       const ip = getClientIp(req)
-      const rl = rateLimit(`${options.rateLimit.bucket}:${ip}`, options.rateLimit.max, options.rateLimit.windowMs)
+      const rl = await rateLimitShared(`${options.rateLimit.bucket}:${ip}`, options.rateLimit.max, options.rateLimit.windowMs)
       if (!rl.allowed) {
         return jsonError(429, `Too many requests. Try again in ${rl.retryAfterSec}s`, { retryAfter: rl.retryAfterSec })
       }

@@ -529,3 +529,14 @@ model PasswordResetOtp {
   @@index([email, createdAt])
   @@schema("csp")
 }
+
+// Shared fixed-window rate limiting across serverless instances (security
+// buckets: login, register, OTP, uploads, orders). In-memory limiter stays as
+// the fallback / dev backend.
+model RateLimitEntry {
+  key             String   @id
+  count           Int      @default(0)
+  windowExpiresAt DateTime
+
+  @@schema("csp")
+}
