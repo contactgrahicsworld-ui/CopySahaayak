@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, ClipboardList, BadgeCheck, Printer, IndianRupee, BarChart3, Settings, LogOut,
-  RefreshCw, FileText, Plus, QrCode, Loader2, Check, X, Store,
+  RefreshCw, FileText, Plus, QrCode, Loader2, Check, X, Store, KeyRound,
 } from 'lucide-react'
 
 interface UserProp { name: string; email: string }
