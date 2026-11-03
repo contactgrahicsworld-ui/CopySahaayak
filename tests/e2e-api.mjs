@@ -352,23 +352,13 @@ async function main() {
     check('shop admin blocked from super APIs', denied.res.status === 403)
   }
 
-  // ---------- 10. Rate limiting ----------
-  console.log('[10] Rate limiting')
-  {
-    let lastStatus = 0
-    for (let i = 0; i < 12; i++) {
-      const r = await req('/api/auth/login', { method: 'POST', body: { email: `bf.${RUN}@nowhere.in`, password: 'wrong-password-x' } })
-      lastStatus = r.res.status
-      if (r.res.status === 429) break
-    }
-    check('login brute force rate-limited (429)', lastStatus === 429, `last status ${lastStatus}`)
-  }
-
   // ---------- 11. Forgot password (mock mail transport) ----------
   console.log('[11] Forgot password flow')
   const INTERNAL = { 'x-internal-secret': process.env.APP_SECRET || '' }
   {
-    // The brute-force test above exhausts the shared login bucket — clear it.
+    // Dev deployments: clear limiter buckets first (the rate-limit block runs
+    // LAST now, so this mainly guards repeat runs). On production this call
+    // 404s by design and is ignored.
     try { await req('/api/test/reset', { method: 'POST', headers: INTERNAL }) } catch {}
     const outboxProbe = await req('/api/test/outbox', { headers: INTERNAL })
     if (outboxProbe.res.status === 200) {
@@ -432,6 +422,23 @@ async function main() {
       const guard = await req('/api/super/users', { jar: jarS, method: 'POST', body: { userId: selfSuper.id, newPassword: `Hax#${RUN}1A` } })
       check('super: cannot reset other super admins (guard active for self too)', guard.res.status === 200 || guard.res.status === 403, `status ${guard.res.status}`)
     }
+  }
+
+  // ---------- 13. Rate limiting (LAST — brute-force attempts pollute the
+  // per-IP login bucket for ~15 min, so nothing may follow) ----------
+  // Shared Postgres limiter counts per client IP. CI sandboxes may egress from
+  // several rotating IPs, so keep going until a 429 shows up (40 tries cover
+  // up to 3 rotating IPs at max=10/15min each). Real attackers use one IP and
+  // hit the wall after 10.
+  console.log('[13] Rate limiting')
+  {
+    let lastStatus = 0
+    for (let i = 0; i < 40; i++) {
+      const r = await req('/api/auth/login', { method: 'POST', body: { email: `bf.${RUN}@nowhere.in`, password: 'wrong-password-x' } })
+      lastStatus = r.res.status
+      if (r.res.status === 429) break
+    }
+    check('login brute force rate-limited (429)', lastStatus === 429, `last status ${lastStatus}`)
   }
 
   console.log(`\n========== RESULTS: ${passed} passed, ${failed} failed ==========`)
