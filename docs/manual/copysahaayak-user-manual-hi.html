@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<title>CopySahaayak उपयोगकर्ता निर्देशिका</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700;900&family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+@page { size: 720px 1020px; margin: 0; }
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --ink:#1a2233; --muted:#5b6472; --brand:#1e40af; --accent:#b45309;
+}
+html,body{ margin:0; padding:0; width:720px; background:var(--bg); color:var(--ink);
+  font-family:'Inter','Noto Sans Devanagari',sans-serif; font-size:15px; line-height:1.75; }
+@media screen{
+  html{ height:auto; display:flex; justify-content:center; background:#222; }
+  body{ transform:scale(1); transform-origin:top center; margin:20px auto; box-shadow:0 8px 40px rgba(0,0,0,.4); }
+}
+p,td,li,div{ overflow-wrap:break-word; word-break:break-word; }
+img,svg{ max-width:100%; height:auto; }
+
+/* ---------- COVER ---------- */
+.cover{ width:720px; height:1020px; box-sizing:border-box; break-after:page; overflow:hidden;
+  background:
+    radial-gradient(circle 170px at 88% 8%, transparent 0, transparent 130px, rgba(255,255,255,.12) 132px, rgba(255,255,255,.12) 170px, transparent 172px),
+    radial-gradient(circle 90px at 74% 22%, transparent 0, transparent 66px, rgba(255,255,255,.09) 68px, rgba(255,255,255,.09) 90px, transparent 92px),
+    radial-gradient(circle 210px at 6% 96%, transparent 0, transparent 162px, rgba(255,255,255,.08) 164px, rgba(255,255,255,.08) 210px, transparent 212px),
+    linear-gradient(160deg,#16255c 0%,#1e40af 58%,#274bbd 100%);
+  color:#fff; display:flex; flex-direction:column; justify-content:center; padding:64px; position:relative; }
+.cover .badge{ display:inline-block; align-self:flex-start; border:1px solid rgba(255,255,255,.45);
+  border-radius:999px; padding:6px 18px; font-size:13px; letter-spacing:2px; font-weight:500; margin-bottom:28px; }
+.cover h1{ font-family:'Noto Sans Devanagari',sans-serif; font-size:56px; line-height:1.18; font-weight:900; margin:0 0 10px; }
+.cover .sub{ font-family:'Noto Sans Devanagari',sans-serif; font-size:19px; line-height:1.7; color:#d7e0ff; max-width:520px; margin:0 0 34px; }
+.cover .chips{ display:flex; flex-wrap:wrap; gap:10px; max-width:540px; }
+.cover .chip{ flex:0 1 auto; min-width:80px; max-width:100%; background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.25); border-radius:10px; padding:10px 16px; font-family:'Noto Sans Devanagari',sans-serif; font-size:14px; font-weight:500; }
+.cover .url{ margin-top:40px; font-size:15px; color:#c7d4ff; letter-spacing:.5px; }
+.cover .foot{ position:absolute; bottom:44px; left:64px; right:64px; display:flex; justify-content:space-between;
+  font-size:12.5px; color:#9fb2e8; letter-spacing:1.5px; }
+
+/* ---------- FLOW CONTENT ---------- */
+.main-content{ padding:56px 60px 40px 60px; }
+.chapter{ break-after:avoid; break-inside:avoid; margin-top:26px; }
+.chapter:first-child{ margin-top:0; }
+.kicker{ font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:2.5px;
+  color:var(--accent); text-transform:uppercase; margin-bottom:4px; }
+h2{ font-family:'Noto Sans Devanagari',sans-serif; font-size:27px; font-weight:900; margin:0 0 6px; color:var(--brand); }
+.rule{ width:64px; height:4px; background:var(--accent); border-radius:2px; margin:10px 0 16px; }
+p{ margin:0 0 12px; }
+.lead{ font-size:16px; color:#33405a; }
+b,strong{ font-weight:700; color:var(--ink); }
+.card{ background:var(--card); border:1px solid #e3e7f0; border-radius:14px; padding:18px 20px;
+  break-inside:avoid; margin-bottom:14px; box-shadow:0 1px 2px rgba(23,32,64,.05); }
+.card.flow{ break-inside:auto; }
+.card h3{ font-family:'Noto Sans Devanagari',sans-serif; font-size:17.5px; font-weight:700; margin:0 0 8px; color:var(--ink); }
+.card p:last-child{ margin-bottom:0; }
+.steps{ counter-reset:st; margin:0 0 12px; padding:0; list-style:none; }
+.steps li{ counter-increment:st; position:relative; padding:0 0 10px 44px; break-inside:avoid; }
+.steps li::before{ content:counter(st); position:absolute; left:0; top:1px; width:28px; height:28px;
+  border-radius:50%; background:var(--brand); color:#fff; font-weight:700; font-size:14px;
+  display:flex; align-items:center; justify-content:center; }
+.steps li::after{ content:''; position:absolute; left:13.5px; top:32px; bottom:2px; width:1.5px; background:#d5dcea; }
+.steps li:last-child::after{ display:none; }
+.note{ background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid var(--accent);
+  border-radius:10px; padding:12px 16px; font-size:14px; break-inside:avoid; margin:0 0 14px; }
+.safe{ background:#eff6ff; border:1px solid #bfdbfe; border-left:4px solid var(--brand); }
+table{ width:100%; max-width:100%; border-collapse:collapse; background:#fff; border:1px solid #e3e7f0;
+  border-radius:12px; overflow:hidden; break-inside:avoid; margin:0 0 14px; font-size:13.5px; }
+th{ background:#eef2fb; color:#233158; text-align:left; font-weight:700; padding:9px 12px; border-bottom:1px solid #dfe5f2; }
+td{ padding:8px 12px; border-bottom:1px solid #eef0f6; vertical-align:top; }
+tr:last-child td{ border-bottom:none; }
+.kv{ color:var(--muted); font-size:13.5px; }
+.two{ display:flex; flex-wrap:wrap; gap:14px; margin-bottom:14px; }
+.two .card{ flex:1 1 280px; min-width:260px; max-width:100%; margin-bottom:0; }
+
+/* ---------- ENDING ---------- */
+.ending{ width:720px; height:1020px; box-sizing:border-box; break-before:page; overflow:hidden;
+  background:
+    radial-gradient(circle 190px at 92% 6%, transparent 0, transparent 148px, rgba(255,255,255,.10) 150px, rgba(255,255,255,.10) 190px, transparent 192px),
+    linear-gradient(200deg,#16255c 0%,#1e40af 70%);
+  color:#fff; display:flex; flex-direction:column; justify-content:center; padding:64px; position:relative; }
+.ending h2{ color:#fff; font-size:40px; }
+.ending .rule{ background:rgba(255,255,255,.6); }
+.ending p{ color:#d7e0ff; max-width:520px; }
+.ending .row{ margin-top:26px; display:flex; flex-wrap:wrap; gap:12px; }
+.ending .pill{ background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.28); border-radius:999px; padding:9px 18px; font-size:14px; }
+</style>
+</head>
+<body>
+
+<!-- ================= COVER ================= -->
+<div class="cover">
+  <div class="badge">USER MANUAL · HINDI EDITION</div>
+  <h1>CopySahaayak<br>उपयोगकर्ता निर्देशिका</h1>
+  <p class="sub">फोटोकॉपी दुकान के लिए संपूर्ण स्वचालन — QR स्कैन से ऑर्डर, UPI भुगतान और ऑटोमैटिक प्रिंटिंग तक। एक ही गाइड में दुकान मालिक, ग्राहक और प्लेटफ़ॉर्म एडमिन — तीनों के लिए पूरी जानकारी।</p>
+  <div class="chips">
+    <div class="chip">QR से ऑर्डर</div>
+    <div class="chip">UPI + UTR सत्यापन</div>
+    <div class="chip">विंडोज़ प्रिंट कनेक्टर</div>
+    <div class="chip">व्हाट्सएप अपडेट</div>
+    <div class="chip">मोबाइल + PC रेस्पॉन्सिव</div>
+  </div>
+  <div class="url">https://copysahaayak.vercel.app</div>
+  <div class="foot"><span>COPYSAHAAYAK PLATFORMS</span><span>संस्करण 1.0 · नवम्बर 2026</span></div>
+</div>
+
+<!-- ================= MAIN ================= -->
+<div class="main-content">
+
+  <!-- CH 1 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 1</div>
+    <h2>CopySahaayak क्या है?</h2>
+    <div class="rule"></div>
+  </div>
+  <p class="lead">CopySahaayak एक क्लाउड-आधारित सॉफ़्टवेयर प्लेटफ़ॉर्म है जो किसी भी फोटोकॉपी / प्रिंटिंग दुकान को ऑनलाइन ऑर्डरिंग में बदल देता है। ग्राहक दुकान के QR कोड को फ़ोन से स्कैन करता है, अपनी फ़ाइलें (PDF/JPG/PNG) अपलोड करता है, कॉपी-संख्या और पेपर साइज़ चुनता है, UPI से भुगतान करता है और अपने फ़ोन पर ही ऑर्डर की लाइव स्थिति देखता रहता है। दुकान के कंप्यूटर पर इंस्टॉल छोटा कनेक्टर प्रोग्राम भुगतान सत्यापन के तुरंत बाद ऑर्डर को सीधे प्रिंटर तक पहुँचा देता है — दुकान मालिक को बस प्रिंट निकले हुए काग़ज़ देने होते हैं।</p>
+  <p>पूरा सिस्टम तीन भूमिकाओं पर चलता है, और इस गाइड में तीनों के लिए अलग-अलग अध्याय दिए गए हैं। कोई भी पासवर्ड या खाता पहले से नहीं बना होता — प्लेटफ़ॉर्म पहली बार खोलने पर ही प्लेटफ़ॉर्म मालिक अपना सुपर एडमिन खाता खुद बनाता है, और दुकान मालिक खुद पंजीकरण करता है। इससे सिस्टम बिल्कुल नए जैसा (first-time fresh) और सुरक्षित रहता है।</p>
+  <div class="two">
+    <div class="card"><h3>ग्राहक (Customer)</h3><p>बिना ऐप, बिना रजिस्ट्रेशन — सिर्फ़ QR स्कैन। फ़ाइल अपलोड, ऑर्डर, UPI भुगतान और लाइव ट्रैकिंग सब मोबाइल ब्राउज़र से। ऑर्डर लिंक WhatsApp पर शेयर भी कर सकता है।</p></div>
+    <div class="card"><h3>दुकान एडमिन (Shop Admin)</h3><p>दुकान मालिक का डैशबोर्ड — ऑर्डर देखना, UTR सत्यापित करना, रेट लिस्ट बदलना, प्रिंटर-डिवाइस जोड़ना, WhatsApp नंबर और UPI ID सेट करना, रिपोर्ट देखना।</p></div>
+    <div class="card"><h3>सुपर एडमिन (Super Admin)</h3><p>प्लेटफ़ॉर्म मालिक — सभी दुकानें, यूज़र्स, सदस्यता (subscription) सत्यापन, प्लेटफ़ॉर्म UPI, ऑडिट लॉग और किसी भी यूज़र का पासवर्ड रीसेट।</p></div>
+  </div>
+
+  <!-- CH 2 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 2</div>
+    <h2>पहली बार शुरुआत — फ्रेश सेटअप</h2>
+    <div class="rule"></div>
+  </div>
+  <p>प्लेटफ़ॉर्म पहली बार खोलने पर कोई भी पुराना खाता नहीं होता। सबसे पहले सुपर एडमिन बनता है, फिर दुकानें खुद पंजीकरण करती हैं। यह व्यवस्था जान-बूझकर बनाई गई है ताकि कोई भी पहले से तय (predefined) पासवर्ड सिस्टम में न हो।</p>
+  <div class="card flow">
+    <h3>सुपर एडमिन बनाना (सिर्फ़ पहली बार)</h3>
+    <ol class="steps">
+      <li>ब्राउज़र में <b>copysahaayak.vercel.app/setup</b> खोलें। जब तक सुपर एडमिन नहीं बना होता, यह पेज सेटअप फ़ॉर्म दिखाता है।</li>
+      <li>अपना नाम, ईमेल और एक मज़बूत पासवर्ड डालें (कम से कम 8 अक्षर, अपर-लोअरकेस + अंक + विशेष चिह्न)।</li>
+      <li>Save दबाएँ — यही खाता प्लेटफ़ॉर्म का सुपर एडमिन बन जाता है। इसके बाद /setup पेज दोबारा उपलब्ध नहीं रहता।</li>
+      <li>अब <b>/super</b> पते से सुपर एडमिन डैशबोर्ड खोलें और ईमेल-पासवर्ड से लॉगिन करें।</li>
+    </ol>
+  </div>
+  <div class="card flow">
+    <h3>दुकान का पंजीकरण (Shop Owner)</h3>
+    <ol class="steps">
+      <li>होमपेज पर <b>Register</b> खोलें — दुकान का नाम, स्लग (जैसे <span class="kv">sharma-xerox</span>), ईमेल और पासवर्ड भरें।</li>
+      <li>पंजीकरण होते ही आप सीधे एडमिन डैशबोर्ड में आ जाते हैं। आपका ग्राहक-ऑर्डर पता बन जाता है: <b>/s/आपका-स्लग</b>।</li>
+      <li>इसी पते का QR कोड बनाकर दुकान पर लगाएँ — Settings टैब में QR डाउनलोड की सुविधा है।</li>
+    </ol>
+  </div>
+  <p class="kv">नया प्लान FREE होता है (प्रति माह 50 ऑर्डर, 1 डिवाइस)। ज़्यादा ऑर्डर के लिए Settings के Subscription हिस्से से Starter / Professional / Enterprise प्लान लिया जा सकता है — UPI से प्लेटफ़ॉर्म UPI पर भुगतान करके UTR जमा करें, सुपर एडमिन सत्यापन के बाद प्लान चालू कर देगा।</p>
+
+  <!-- CH 3 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 3</div>
+    <h2>दुकान एडमिन डैशबोर्ड — पूरा इस्तेमाल</h2>
+    <div class="rule"></div>
+  </div>
+  <p>लॉगिन के बाद खुलने वाला डैशबोर्ड सात टैब में बँटा है। ऊपर की पट्टी से कोई भी टैब चुनें — मोबाइल पर यह पट्टी आसानी से बाएँ-दाएँ स्क्रॉल हो जाती है, और पूरा डैशबोर्ड छोटे फ़ोन स्क्रीन पर भी बिना कटे चलता है।</p>
+  <table>
+    <tr><th style="width:32%">टैब</th><th>क्या-क्या करें</th></tr>
+    <tr><td><b>Overview</b></td><td>आज/इस महीने के ऑर्डर, कमाई, पेंडिंग सत्यापन और प्रिंट-कतार की एक नज़र में जानकारी।</td></tr>
+    <tr><td><b>Orders</b></td><td>हर ऑर्डर कार्ड पर क्लिक करके फ़ाइलें देखें, दस्तावेज़ प्रीव्यू खोलें, UTR देखें। Status के अनुसार बटन मिलेंगे — नीचे विस्तार से।</td></tr>
+    <tr><td><b>Payments</b></td><td>सभी भुगतान और उनकी स्थिति — यहीं से UTR सत्यापन (Verify/Reject) होता है।</td></tr>
+    <tr><td><b>Printers &amp; Devices</b></td><td>विंडोज़ कनेक्टर के लिए 6-अंकों का पेयरिंग कोड बनाएँ, डिवाइस की स्थिति देखें, ग़लत डिवाइस रद्द करें।</td></tr>
+    <tr><td><b>Pricing</b></td><td>A4/A3/A5/Legal × B/W/Colour के रेट (सिंगल-साइडेड और डुप्लेक्स) बदलें — ग्राहक को यही रेट दिखेंगे।</td></tr>
+    <tr><td><b>Reports</b></td><td>दिन/महीने के हिसाब से ऑर्डर और कमाई की रिपोर्ट।</td></tr>
+    <tr><td><b>Settings</b></td><td>दुकान प्रोफ़ाइल, फ़ोन, <b>WhatsApp नंबर</b>, <b>UPI ID (VPA)</b>, पेयी नाम, लोगो अपलोड और सदस्यता।</td></tr>
+  </table>
+  <div class="card flow">
+    <h3>ऑर्डर लाइफ़साइकल — 5 स्टेप</h3>
+    <ol class="steps">
+      <li><b>PENDING_PAYMENT</b> — ऑर्डर बना, ग्राहक UPI से पैसे भेज रहा है।</li>
+      <li><b>AWAITING_VERIFICATION</b> — ग्राहक ने UTR दर्ज कर दिया; Payments/Orders टैब में UTR आपको दिखेगा।</li>
+      <li><b>CONFIRMED</b> — आपने Verify दबाया; ऑर्डर अपने-आप प्रिंट-कतार में चला गया, कनेक्टर प्रिंट करने लगा।</li>
+      <li><b>COMPLETED</b> — सारे प्रिंट निकल गए; ग्राहक को Ready दिखता है। कोई ग़लती हो तो Retry failed print jobs बटन से दोबारा भेजें।</li>
+      <li><b>CANCELLED / REJECTED</b> — UTR ग़लत होने पर Reject करें (कारण लिखें); ग्राहक को वजह दिखती है।</li>
+    </ol>
+  </div>
+  <div class="note">UTR सत्यापन का सही तरीका: अपना UPI ऐप खोलें, उसी रक़म और उसी दिन की आई भुगतान खोजें, 12-अंकों का UTR मिलान करें — फिर ही Verify दबाएँ। Verify होते ही पैसे आपके UPI खाते में आ चुके होते हैं (पैसे प्लेटफ़ॉर्म से नहीं गुज़रते, सीधे आपके खाते में आते हैं)।</div>
+
+  <!-- CH 4 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 4</div>
+    <h2>UPI भुगतान — कैसे 100% काम करता है</h2>
+    <div class="rule"></div>
+  </div>
+  <p>भुगतान सीधा दुकान के UPI खाते में जाता है। ग्राहक को ऑर्डर के समय एक <b>डायनैमिक UPI QR</b> दिखता है — उसमें आपकी UPI ID, पेयी नाम और <b>ठीक-ठीक ऑर्डर रक़म</b> पहले से भरी रहती है, इसलिए रक़म ग़लत डालने की गुंजाइश नहीं रहती। ग्राहक GPay / PhonePe / Paytm / बैंक ऐप — किसी से भी स्कैन करके पैसे भेजता है।</p>
+  <div class="card flow">
+    <h3>पूरा फ़्लो (दुकान मालिक के नज़र से)</h3>
+    <ol class="steps">
+      <li>Settings टैब में अपनी <b>UPI ID (VPA)</b> और पेयी नाम सेव करें — यह एक बार का काम है। यही QR का आधार बनता है।</li>
+      <li>ग्राहक ऑर्डर करके QR स्कैन करता है, पैसे भेजता है — पैसे तुरंत आपके खाते में।</li>
+      <li>ग्राहक अपने ऐप से <b>UTR</b> (12-अंकों का ट्रांज़ैक्शन रेफ़रेंस) कॉपी करके ऑर्डर पेज पर दर्ज करता है।</li>
+      <li>आपको Overview पर पेंडिंग सत्यापन दिखेगा — UTR अपने ऐप से मिलाकर <b>Verify</b> दबाएँ।</li>
+      <li>सत्यापन होते ही ऑर्डर अपने-आप प्रिंट होने चला जाता है — कुछ करने की ज़रूरत नहीं।</li>
+    </ol>
+  </div>
+  <p class="kv">UTR न मिले या ग़लत हो तो Reject करें और कारण लिखें — ग्राहक को ट्रैकिंग पेज पर वजह दिखती है। एक UTR एक बार ही इस्तेमाल हो सकता है; डुप्लीकेट UTR सिस्टम अपने-आप रोक देता है।</p>
+
+  <!-- CH 5 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 5</div>
+    <h2>WhatsApp अपडेट — ग्राहक तक सीधी ख़बर</h2>
+    <div class="rule"></div>
+  </div>
+  <p>WhatsApp की सुविधा दो तरफ़ से काम करती है, बिना किसी अतिरिक्त API-अप्रूवल के — सिस्टम सीधा WhatsApp का आधिकारिक wa.me लिंक इस्तेमाल करता है, इसलिए यह हर Android, iPhone और WhatsApp Web पर हमेशा चलता है।</p>
+  <div class="two">
+    <div class="card"><h3>दुकान मालिक की तरफ़ से</h3><p>Settings में अपना WhatsApp नंबर सेव करें (यह दुकान का संपर्क बनता है)। ऑर्डर कार्ड खोलने पर <b>WhatsApp update</b> बटन मिलेगा — दबाते ही WhatsApp खुलेगा और उस ग्राहक के नंबर पर ऑर्डर स्थिति का तैयार संदेश लिखा आ जाएगा (जैसे: ऑर्डर कन्फ़र्म हुआ / प्रिंट तैयार है)। बस Send दबाएँ। ग्राहक का फ़ोन नंबर ऑर्डर करते समय ही लिया जाता है।</p></div>
+    <div class="card"><h3>ग्राहक की तरफ़ से</h3><p>ऑर्डर ट्रैकिंग पेज के नीचे <b>WhatsApp par status share karein</b> बटन है — ग्राहक इससे अपने ऑर्डर की स्थिति किसी भी चैट (घरवालों, दोस्तों) में भेज सकता है। संदेश में ऑर्डर नंबर, दुकान और रक़म पहले से लिखी आती है।</p></div>
+  </div>
+
+  <!-- CH 6 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 6</div>
+    <h2>विंडोज़ प्रिंट कनेक्टर — इंस्टॉल और सेटअप</h2>
+    <div class="rule"></div>
+  </div>
+  <p>ऑटोमैटिक प्रिंटिंग के लिए दुकान के विंडोज़ PC (Windows 10/11, 64-bit) पर एक छोटा कनेक्टर प्रोग्राम इंस्टॉल करना होता है। यह बैकग्राउंड में चुपचाप चलता रहता है, भुगतान सत्यापन होते ही ऑर्डर उठाकर सही प्रिंटर पर सही साइज़ के पेपर में प्रिंट कर देता है।</p>
+  <div class="card flow">
+    <h3>इंस्टॉलेशन के स्टेप</h3>
+    <ol class="steps">
+      <li>एडमिन डैशबोर्ड के <b>Printers &amp; Devices</b> टैब (या <b>/download</b> पेज) से <b>PhotocopyShopConnector-Setup.exe</b> डाउनलोड करें।</li>
+      <li>फ़ाइल पर डबल-क्लिक करें। अगर विंडोज़ नीली चेतावनी दिखाए (SmartScreen), तो <b>More info</b> → <b>Run anyway</b> दबाएँ — नीचे सुरक्षा-नोट पढ़ें।</li>
+      <li>इंस्टॉल होने के बाद कनेक्टर खुलेगा — डैशबोर्ड से बनाया 6-अंकों का <b>पेयरिंग कोड</b> डालें (कोड हर 10 मिनट में नया बनता है)।</li>
+      <li>प्रिंटर मैपिंग विंडो में तय करें — B/W ऑर्डर किस प्रिंटर पर, Colour किस पर, और कौन-सा ट्रे/साइज़ (A4/A3/A5/Legal)। डिफ़ॉल्ट ANY छोड़ने पर सब कुछ डिफ़ॉल्ट प्रिंटर पर निकलता है।</li>
+      <li>कनेक्टर ट्रे (system tray) में बैठ जाता है और Windows चालू होने पर अपने-आप स्टार्ट होता है — रोज़ कुछ खोलने की ज़रूरत नहीं।</li>
+    </ol>
+  </div>
+  <div class="note safe"><b>सुरक्षा-नोट (SmartScreen):</b> इंस्टॉलर अभी कोड-साइन्ड नहीं है (कोड-साइनिंग सर्टिफ़िकेट हर साल की ख़र्च वाली चीज़ है), इसलिए विंडोज़ पहली बार चेतावनी दिखा सकता है। यह सामान्य है — <b>More info → Run anyway</b> से आगे बढ़ें। फ़ाइल हमेशा अपने ऑफ़िशियल पते copysahaayak.vercel.app/download से ही डाउनलोड करें; WhatsApp पर आई किसी अनजान फ़ाइल को कभी न चलाएँ। macOS पर कनेक्टर उपलब्ध नहीं है — Mac से आप डैशबोर्ड का पूरा इस्तेमाल ब्राउज़र में कर सकते हैं।</div>
+  <p class="kv">अगर प्रिंट नहीं निकला: कनेक्टर ट्रे-आइकन खोलें — वहाँ हर जॉब की स्थिति दिखती है। प्रिंटर बंद/ऑफ़लाइन होने पर जॉब FAILED दिखेगा; डैशबोर्ड के Retry failed print jobs से दोबारा भेजें। नया पेयरिंग कोड लेना हो तो पुराना डिवाइस Revoke करके नया कोड बनाएँ।</p>
+
+  <!-- CH 7 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 7</div>
+    <h2>पासवर्ड भूल गए? — रीसेट के तीन रास्ते</h2>
+    <div class="rule"></div>
+  </div>
+  <p>पासवर्ड रीसेट के लिए लॉगिन पेज पर <b>Forgot password</b> लिंक है। वहाँ अपना ईमेल डालने पर सिस्टम 6-अंकों का OTP कोड भेजता है — कोड 10 मिनट तक मान्य रहता है और एक बार इस्तेमाल होने के बाद निष्प्रभावी हो जाता है। कोड दर्ज करके नया पासवर्ड सेट कर लें।</p>
+  <div class="two">
+    <div class="card"><h3>रास्ता 1 — ईमेल OTP</h3><p>ईमेल पर आया 6-अंकों का कोड डालें। नोट: फ़्री Supabase बिल्ट-इन मेल सेवा घंटे में सीमित ईमेल भेजती है; लिमिट लगने पर सिस्टम शिष्ट संदेश दिखाता है — थोड़ी देर बाद दोबारा कोशिश करें, या रास्ता 2/3 अपनाएँ। (अनलिमिटेड ईमेल चालू करने का तरीक़ा FAQ में दिया है।)</p></div>
+    <div class="card"><h3>रास्ता 2 — सुपर एडमिन रीसेट</h3><p>सुपर एडमिन डैशबोर्ड के Users हिस्से से किसी भी यूज़र (दुकान मालिक/स्टाफ़) का पासवर्ड तुरंत रीसेट किया जा सकता है — ईमेल चालू हो या नहीं, यह हमेशा काम करता है।</p></div>
+    <div class="card"><h3>रास्ता 3 — ख़ुद पासवर्ड बदलें</h3><p>लॉगिन होने के बाद दोनों डैशबोर्ड के हेडर में ताले (Change password) के आइकन से कोई भी अपना पासवर्ड कभी भी बदल सकता है — पुराना पासवर्ड डालकर।</p></div>
+  </div>
+
+  <!-- CH 8 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 8</div>
+    <h2>सुरक्षा — आपका डेटा कैसे सुरक्षित है</h2>
+    <div class="rule"></div>
+  </div>
+  <p>प्लेटफ़ॉर्म की सुरक्षा-योजना शुरुआत से ही इस उद्देश्य से बनी है कि कोई भी पहले से तय क्रेडेंशियल, डेमो खाता या बैकडोर न हो। सभी खाते सिस्टम पर ही बनते हैं — पहला सुपर एडमिन /setup से, दुकानें Register से। इसके अलावा ये सुरक्षा-कवच लगे हैं:</p>
+  <table>
+    <tr><th style="width:38%">सुरक्षा-कवच</th><th>मतलब</th></tr>
+    <tr><td><b>टेनेंट आइसोलेशन</b></td><td>हर दुकान का डेटा दूसरी दुकान से पूरी तरह अलग — एक दुकान दूसरी के ऑर्डर/भुगतान/रेट नहीं देख सकती, API लेवल पर 404/401 रोक लगती है।</td></tr>
+    <tr><td><b>OTP सुरक्षा</b></td><td>पासवर्ड-रीसेट कोड कभी सीधा सेव नहीं होता — केवल SHA-256 हैश सेव होता है, 10 मिनट में एक्सपायर।</td></tr>
+    <tr><td><b>लॉगिन ब्रूट-फ़ोर्स रोक</b></td><td>ग़लत पासवर्ड की कोशिशें सीमित — सीमा पार होने पर कुछ मिनट के लिए 429 रोक। सीमा सर्वर पर साझा रूप से गिनी जाती है।</td></tr>
+    <tr><td><b>साइन्ड फ़ाइल URL</b></td><td>ग्राहक की फ़ाइलें प्राइवेट रहती हैं; प्रिंट कनेक्टर को समय-सीमित HMAC-साइन्ड URL ही मिलती है, कच्चा पता कभी नहीं।</td></tr>
+    <tr><td><b>ऑडिट लॉग</b></td><td>भुगतान सत्यापन, प्लान बदलाव, रीसेट — सब कुछ सुपर एडमिन के ऑडिट लॉग में दर्ज रहता है।</td></tr>
+    <tr><td><b>डिवाइस टोकन</b></td><td>कनेक्टर को अलग टोकन मिलता है; कोई डिवाइस शक हो तो Revoke करते ही उसका टोकन तुरंत बेकार।</td></tr>
+  </table>
+
+  <!-- CH 9 -->
+  <div class="chapter">
+    <div class="kicker">अध्याय 9</div>
+    <h2>अक्सर पूछे जाने वाले सवाल (FAQ)</h2>
+    <div class="rule"></div>
+  </div>
+  <div class="card"><h3>क्या यह मोबाइल पर सही चलेगा?</h3><p>हाँ — पूरा ऐप हर Android/iPhone ब्राउज़र (Chrome, Safari, Edge) पर रिस्पॉन्सिव है: 360px से लेकर बड़ी स्क्रीन तक कोई कटिंग नहीं, टैब बार स्क्रॉल होता है, फ़ॉर्म फ़ील्ड iOS ऑटो-ज़ूम रोकने के लिए सही साइज़ के हैं। Windows और Mac ब्राउज़र पर भी पूरा डैशबोर्ड चलता है।</p></div>
+  <div class="card"><h3>UTR क्या होता है और मिलेगा कहाँ से?</h3><p>UTR = Unified Transactions Reference — UPI भुगतान का 12-अंकों का नंबर। GPay/PhonePe/Paytm में भुगतान के बाद "Transaction details/History" में दिखता है। ग्राहक इसे कॉपी करके ऑर्डर पेज पर दर्ज करता है, दुकान उसी से भुगतान मिलाती है।</p></div>
+  <div class="card"><h3>रीसेट का ईमेल नहीं आ रहा — क्या करें?</h3><p>फ़्री Supabase मेल सेवा की घंटेवार सीमा भर जाना सबसे आम कारण है (संदेश में कितने मिनट बाद कोशिश करनी है दिख जाता है)। तुरंत ज़रूरत हो तो सुपर एडमिन रीसेट इस्तेमाल करें। स्थायी समाधान: Supabase डैशबोर्ड → Authentication → SMTP Settings में अपना SMTP डालें (जैसे Gmail App Password) — उसके बाद ईमेल सीमा ख़त्म। ऐप कोई कोड बदलवाने की ज़रूरत नहीं; यह सेटिंग प्लेटफ़ॉर्म-स्तर की है।</p></div>
+  <div class="card"><h3>SmartScreen बार-बार चेतावनी देता है</h3><p>कोड-साइनिंग सर्टिफ़िकेट लगने तक पहली इंस्टॉल पर "More info → Run anyway" दबाना होगा। इंस्टॉल के बाद फिर चेतावनी नहीं आती। फ़ाइल हमेशा ऑफ़िशियल /download पेज से लें — यही सबसे बड़ी सुरक्षा है।</p></div>
+  <div class="card"><h3>प्लान ख़त्म हो जाए तो ऑर्डर आना बंद हो जाएंगे?</h3><p>FREE प्लान में 50 ऑर्डर/माह तक चलता रहता है। पेड प्लान की मियाद ख़त्म होने पर Settings → Subscription से नया प्लान UPI + UTR वाले उसी तरीक़े से ले लें; सुपर एडमिन सत्यापन के तुरंत बाद चालू हो जाता है।</p></div>
+  <div class="card"><h3>एक से ज़्यादा कनेक्टर/डिवाइस चला सकते हैं?</h3><p>हाँ — प्लान के अनुसार डिवाइस-सीमा है (FREE में 1, Professional में 3, Enterprise में 10)। हर PC के लिए अलग पेयरिंग कोड बनाएँ; बदलाव के लिए पुराना Revoke करें।</p></div>
+
+</div><!-- /main-content -->
+
+<!-- ================= ENDING ================= -->
+<div class="ending">
+  <div class="kicker" style="color:#f6c99a;">समर्थन और संपर्क</div>
+  <h2>मदद चाहिए?</h2>
+  <div class="rule"></div>
+  <p>कोई भी तकनीकी दिक़्क़त हो तो सबसे पहले एडमिन डैशबोर्ड का Overview टैब देखें — अधिकतर जवाब वहीं मिल जाते हैं। प्लेटफ़ॉर्म स्तर की समस्या (सदस्यता, किसी यूज़र का रीसेट, सस्पेंशन) के लिए अपने सुपर एडमिन से संपर्क करें।</p>
+  <div class="row">
+    <div class="pill">वेबसाइट: copysahaayak.vercel.app</div>
+    <div class="pill">कनेक्टर डाउनलोड: /download</div>
+    <div class="pill">सेटअप: /setup</div>
+  </div>
+  <p style="margin-top:36px; font-size:13px; color:#9fb2e8;">CopySahaayak उपयोगकर्ता निर्देशिका · हिंदी संस्करण 1.0 · नवम्बर 2026 में संकलित। यह दस्तावेज़ प्लेटफ़ॉर्म की वर्तमान सुविधाओं के अनुसार है।</p>
+</div>
+
+</body>
+</html>
