@@ -576,6 +576,10 @@ function PlansTab() {
               <Label className="text-xs">Max orders/month</Label>
               <Input type="number" defaultValue={p.maxOrdersMonth ?? ''} placeholder="unlimited" onBlur={(e) => { const v = e.target.value ? Number(e.target.value) : null; if (v !== p.maxOrdersMonth) save(p, { maxOrdersMonth: v }) }} />
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Max printers</Label>
+              <Input type="number" defaultValue={p.maxDevices ?? ''} placeholder="unlimited" onBlur={(e) => { const v = e.target.value ? Number(e.target.value) : null; if (v !== p.maxDevices) save(p, { maxDevices: v }) }} />
+            </div>
             <div className="flex items-center gap-2">
               {savingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
               <Button size="sm" variant={p.isActive ? 'default' : 'outline'} onClick={() => save(p, { isActive: !p.isActive })}>

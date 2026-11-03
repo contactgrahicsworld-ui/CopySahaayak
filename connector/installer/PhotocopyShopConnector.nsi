@@ -10,8 +10,8 @@ RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 
 !define PRODUCT_NAME        "Photocopy Shop Connector"
-!define PRODUCT_VERSION     "1.0.0"
-!define PRODUCT_PUBLISHER   "Photocopy Shop"
+!define PRODUCT_VERSION     "1.1.0"
+!define PRODUCT_PUBLISHER   "CopySahaayak Platforms"
 !define PRODUCT_EXE         "PhotocopyShopConnector.exe"
 !define PRODUCT_UNINST_KEY  "Software\Microsoft\Windows\CurrentVersion\Uninstall\PhotocopyShopConnector"
 !define PROTOCOL_KEY        "Software\Classes\photocopyconnector"
@@ -26,13 +26,13 @@ InstallDir "$PROGRAMFILES64\PhotocopyShopConnector"
 ShowInstDetails show
 ShowUnInstDetails nevershow
 
-VIProductVersion "1.0.0.0"
+VIProductVersion "1.1.0.0"
 VIAddVersionKey /LANG=1033 ProductName      "${PRODUCT_NAME}"
 VIAddVersionKey /LANG=1033 ProductVersion   "${PRODUCT_VERSION}"
 VIAddVersionKey /LANG=1033 FileVersion      "${PRODUCT_VERSION}"
 VIAddVersionKey /LANG=1033 FileDescription  "Installer for the ${PRODUCT_NAME}"
 VIAddVersionKey /LANG=1033 CompanyName      "${PRODUCT_PUBLISHER}"
-VIAddVersionKey /LANG=1033 LegalCopyright   "© ${PRODUCT_PUBLISHER}"
+VIAddVersionKey /LANG=1033 LegalCopyright   "MIT License - Copyright (c) 2026 ${PRODUCT_PUBLISHER}"
 
 !define MUI_ICON   "..\PhotocopyShopConnector\app.ico"
 !define MUI_UNICON "..\PhotocopyShopConnector\app.ico"
@@ -42,6 +42,7 @@ VIAddVersionKey /LANG=1033 LegalCopyright   "© ${PRODUCT_PUBLISHER}"
 !define MUI_FINISHPAGE_RUN_TEXT   "Start ${PRODUCT_NAME} now"
 
 !insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "License.txt"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -56,6 +57,7 @@ VIAddVersionKey /LANG=1033 LegalCopyright   "© ${PRODUCT_PUBLISHER}"
 ; ---------------------------------------------------------------------------
 Section "Install" SecInstall
   SetOutPath "$INSTDIR"
+  File "License.txt"
 
   ; Stop a running instance so the executable is not locked (best effort).
   DetailPrint "Stopping any running instance…"

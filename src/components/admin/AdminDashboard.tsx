@@ -18,7 +18,8 @@ import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, ClipboardList, BadgeCheck, Printer, IndianRupee, BarChart3, Settings, LogOut,
-  RefreshCw, FileText, Plus, QrCode, Loader2, Check, X, Store, KeyRound, MessageCircle,
+  RefreshCw, FileText, Plus, QrCode, Loader2, Check, X, Store, KeyRound, MessageCircle, Download,
+  TriangleAlert,
 } from 'lucide-react'
 
 // wa.me deep link: works on every phone/WhatsApp Web with no API approval needed.
@@ -50,6 +51,19 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
   const router = useRouter()
   const [tab, setTab] = useState('overview')
   const [pwOpen, setPwOpen] = useState(false)
+  // White-label: the shop's own name is the app name everywhere (tab title too).
+  useEffect(() => { document.title = `${shop.name} — Dashboard` }, [shop.name])
+  // Plan expiry watch: warn from 7 days before the subscription ends.
+  const [expiry, setExpiry] = useState<{ planName: string; expiresAt: string; daysLeft: number } | null>(null)
+  useEffect(() => {
+    fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+      const sub = d?.subscription
+      if (!sub?.expiresAt || !['ACTIVE', 'PENDING_VERIFICATION'].includes(sub.status)) return
+      const ms = new Date(sub.expiresAt).getTime() - Date.now()
+      const daysLeft = Math.ceil(ms / 86400000)
+      if (daysLeft <= 7) setExpiry({ planName: sub.plan?.name || 'Current plan', expiresAt: sub.expiresAt, daysLeft })
+    }).catch(() => {})
+  }, [])
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -80,6 +94,17 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
       </header>
 
       <div className="container mx-auto px-3 sm:px-4 py-4">
+        {expiry && (
+          <div role="alert" className={`mb-4 flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border px-4 py-3 text-sm ${expiry.daysLeft < 0 ? 'border-red-300 bg-red-50 text-red-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
+            <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />
+            <p className="flex-1">
+              {expiry.daysLeft < 0
+                ? `Your ${expiry.planName} plan expired on ${new Date(expiry.expiresAt).toLocaleDateString('en-IN')}. Renew now to keep receiving orders.`
+                : `Your ${expiry.planName} plan ends in ${expiry.daysLeft} day${expiry.daysLeft === 1 ? '' : 's'} (${new Date(expiry.expiresAt).toLocaleDateString('en-IN')}). Renew before it expires to avoid interruptions.`}
+            </p>
+            <Button size="sm" variant={expiry.daysLeft < 0 ? 'destructive' : 'default'} onClick={() => setTab('settings')} className="shrink-0">Renew now</Button>
+          </div>
+        )}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="w-full h-auto flex-nowrap overflow-x-auto no-scrollbar justify-start gap-1 mb-4">
             <TabsTrigger value="overview" className="shrink-0"><LayoutDashboard className="h-4 w-4 mr-1" aria-hidden /> Overview</TabsTrigger>
@@ -100,6 +125,12 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
           <TabsContent value="settings"><SettingsTab shop={shop} /></TabsContent>
         </Tabs>
       </div>
+
+      <footer className="border-t mt-8">
+        <div className="container mx-auto px-4 py-3 text-center text-[11px] text-muted-foreground">
+          Powered by CopySahaayak
+        </div>
+      </footer>
 
       <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
     </main>
@@ -760,45 +791,72 @@ function PricingTab() {
 // ---------- Reports ----------
 function ReportsTab() {
   const [data, setData] = useState<{
-    daily: Array<{ date: string; revenuePaise: number; orders: number }>
-    summary: { totalRevenuePaise: number; totalOrders: number; bwSides: number; colorSides: number; bwRevenuePaise: number; colorRevenuePaise: number }
+    groupBy: 'day' | 'week' | 'month'
+    series: Array<{ period: string; revenuePaise: number; orders: number }>
+    summary: { totalRevenuePaise: number; totalOrders: number; bwSides: number; colorSides: number; bwRevenuePaise: number; colorRevenuePaise: number; sheetsTotal: number }
+    paper: Array<{ paperSize: string; colorMode: string; sides: number; sheets: number; revenuePaise: number }>
+    machine: Array<{ device: string; completedJobs: number }>
   } | null>(null)
   const [days, setDays] = useState('30')
+  const [groupBy, setGroupBy] = useState('day')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/admin/reports?days=${days}`, { cache: 'no-store' }).then((r) => r.json()).then(setData)
-  }, [days])
+    let dead = false
+    setLoading(true)
+    fetch(`/api/admin/reports?days=${days}&groupBy=${groupBy}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { if (!dead) setData(d) })
+      .catch(() => {})
+      .finally(() => { if (!dead) setLoading(false) })
+    return () => { dead = true }
+  }, [days, groupBy])
 
   if (!data) return <CenterSpinner />
-  const max = Math.max(1, ...data.daily.map((d) => d.revenuePaise))
+  const max = Math.max(1, ...data.series.map((d) => d.revenuePaise))
+  const periodLabel = groupBy === 'day' ? 'day' : groupBy === 'week' ? 'week' : 'month'
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Select value={days} onValueChange={setDays}>
           <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {['7', '14', '30', '90'].map((d) => (
+            {['7', '14', '30', '90', '180', '365'].map((d) => (
               <SelectItem key={d} value={d}>Last {d} days</SelectItem>
             ))}
           </SelectContent>
         </Select>
+        <Select value={groupBy} onValueChange={setGroupBy}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="day">Daily</SelectItem>
+            <SelectItem value="week">Weekly</SelectItem>
+            <SelectItem value="month">Monthly</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" className="ml-auto" asChild>
+          <a href={`/api/admin/reports/export?days=${days}&groupBy=${groupBy}`} download>
+            <Download className="h-4 w-4 mr-1.5" aria-hidden /> Download Excel
+          </a>
+        </Button>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Revenue" value={formatInr(data.summary.totalRevenuePaise)} />
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <StatCard label={`Revenue (per ${periodLabel})`} value={formatInr(data.summary.totalRevenuePaise)} />
         <StatCard label="Paid orders" value={String(data.summary.totalOrders)} />
-        <StatCard label="B/W sides printed" value={String(data.summary.bwSides)} />
-        <StatCard label="Colour sides printed" value={String(data.summary.colorSides)} />
+        <StatCard label="B/W sides" value={String(data.summary.bwSides)} />
+        <StatCard label="Colour sides" value={String(data.summary.colorSides)} />
+        <StatCard label="Paper sheets used" value={String(data.summary.sheetsTotal)} />
       </div>
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">Revenue by day</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Collection by {periodLabel}</CardTitle></CardHeader>
         <CardContent>
-          {data.daily.length === 0 ? (
+          {data.series.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No confirmed orders in this period yet.</p>
           ) : (
-            <div className="space-y-1.5">
-              {data.daily.map((d) => (
-                <div key={d.date} className="flex items-center gap-2 text-xs">
-                  <span className="w-20 shrink-0 text-muted-foreground">{d.date.slice(5)}</span>
+            <div className={`space-y-1.5 ${loading ? 'opacity-60' : ''}`}>
+              {data.series.map((d) => (
+                <div key={d.period} className="flex items-center gap-2 text-xs">
+                  <span className="w-20 shrink-0 text-muted-foreground">{d.period.slice(5)}</span>
                   <div className="h-4 rounded bg-primary/70" style={{ width: `${(d.revenuePaise / max) * 70}%` }} />
                   <span className="font-medium">{formatInr(d.revenuePaise)}</span>
                   <span className="text-muted-foreground">({d.orders})</span>
@@ -808,6 +866,64 @@ function ReportsTab() {
           )}
         </CardContent>
       </Card>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Paper usage (by size & colour)</CardTitle></CardHeader>
+          <CardContent>
+            {data.paper.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No paper used yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Mode</TableHead>
+                    <TableHead className="text-right">Sides</TableHead>
+                    <TableHead className="text-right">Sheets</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.paper.map((p) => (
+                    <TableRow key={`${p.paperSize}-${p.colorMode}`}>
+                      <TableCell>{p.paperSize}</TableCell>
+                      <TableCell>{p.colorMode === 'BW' ? 'B/W' : 'Colour'}</TableCell>
+                      <TableCell className="text-right">{p.sides}</TableCell>
+                      <TableCell className="text-right">{p.sheets}</TableCell>
+                      <TableCell className="text-right">{formatInr(p.revenuePaise)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Prints by machine</CardTitle></CardHeader>
+          <CardContent>
+            {data.machine.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No completed prints in this period yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Device</TableHead>
+                    <TableHead className="text-right">Completed jobs</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.machine.map((m) => (
+                    <TableRow key={m.device}>
+                      <TableCell className="truncate max-w-[200px]">{m.device}</TableCell>
+                      <TableCell className="text-right">{m.completedJobs}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

@@ -19,10 +19,10 @@ async function main() {
   }
 
   const planDefs = [
-    { code: 'FREE', name: 'Free', pricePaise: 0, durationDays: 3650, maxOrdersMonth: 50, maxStorageMb: 200, maxDevices: 1, maxStaff: 1, features: ['50 orders/month', '1 device', '200 MB storage'], sortOrder: 1 },
-    { code: 'STARTER', name: 'Starter', pricePaise: 19900, durationDays: 30, maxOrdersMonth: 500, maxStorageMb: 2048, maxDevices: 1, maxStaff: 2, features: ['500 orders/month', '1 device', '2 GB storage', 'Email support'], sortOrder: 2 },
-    { code: 'PROFESSIONAL', name: 'Professional', pricePaise: 49900, durationDays: 30, maxOrdersMonth: 3000, maxStorageMb: 10240, maxDevices: 3, maxStaff: 5, features: ['3,000 orders/month', '3 devices', '10 GB storage', 'Priority support'], sortOrder: 3 },
-    { code: 'ENTERPRISE', name: 'Enterprise', pricePaise: 99900, durationDays: 90, maxOrdersMonth: null, maxStorageMb: 51200, maxDevices: 10, maxStaff: 20, features: ['Unlimited orders', '10 devices', '50 GB storage', 'Dedicated support'], sortOrder: 4 },
+    { code: 'FREE', name: 'Free', pricePaise: 0, durationDays: 3650, maxOrdersMonth: 50, maxStorageMb: 200, maxDevices: 4, maxStaff: 1, features: ['50 orders/month', '4 printers', '200 MB storage'], sortOrder: 1 },
+    { code: 'STARTER', name: 'Starter', pricePaise: 19900, durationDays: 30, maxOrdersMonth: 500, maxStorageMb: 2048, maxDevices: 8, maxStaff: 2, features: ['500 orders/month', '8 printers (+4)', '2 GB storage', 'Email support'], sortOrder: 2 },
+    { code: 'PROFESSIONAL', name: 'Professional', pricePaise: 49900, durationDays: 30, maxOrdersMonth: 3000, maxStorageMb: 10240, maxDevices: 12, maxStaff: 5, features: ['3,000 orders/month', '12 printers (+8)', '10 GB storage', 'Priority support'], sortOrder: 3 },
+    { code: 'ENTERPRISE', name: 'Enterprise', pricePaise: 99900, durationDays: 90, maxOrdersMonth: null, maxStorageMb: 51200, maxDevices: 16, maxStaff: 20, features: ['Unlimited orders', '16 printers (+12)', '50 GB storage', 'Dedicated support'], sortOrder: 4 },
   ]
   for (const p of planDefs) {
     const { features, ...planData } = p
