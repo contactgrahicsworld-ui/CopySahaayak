@@ -944,6 +944,32 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
   const [utr, setUtr] = useState('')
   const [payerName, setPayerName] = useState('')
   const [qr, setQr] = useState<{ url: string; dataUrl: string } | null>(null)
+  // Scan-to-pay QR for plan payments — always points to the PLATFORM (super admin) UPI.
+  const [payQr, setPayQr] = useState<{ dataUrl: string; payload: string; vpa: string; payee: string; amountPaise: number } | null>(null)
+  const [payQrErr, setPayQrErr] = useState('')
+
+  useEffect(() => {
+    if (!payPlan) { setPayQr(null); setPayQrErr(''); return }
+    let live = true
+    setPayQr(null)
+    setPayQrErr('')
+    fetch(`/api/admin/subscription/qr?planCode=${payPlan.code}`, { cache: 'no-store' })
+      .then(async (r) => {
+        const d = await r.json()
+        if (!r.ok) throw new Error(d.error || 'Could not load payment QR')
+        if (live) setPayQr(d)
+      })
+      .catch((e) => { if (live) setPayQrErr(e instanceof Error ? e.message : 'Could not load payment QR') })
+    return () => { live = false }
+  }, [payPlan])
+
+  function copyPlatformUpi() {
+    if (!payQr?.vpa) return
+    navigator.clipboard?.writeText(payQr.vpa).then(
+      () => toast({ title: 'UPI ID copied', description: payQr.vpa }),
+      () => toast({ title: 'Copy failed', variant: 'destructive' })
+    )
+  }
 
   useEffect(() => {
     fetch(`/api/shops/${shop.slug}/qr`, { cache: 'no-store' })
@@ -1095,8 +1121,12 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
               {sub.subscription.expiresAt ? ` · until ${new Date(sub.subscription.expiresAt).toLocaleDateString('en-IN')}` : ''}
             </p>
           )}
-          {sub?.superAdminUpi && (
-            <p className="text-sm text-muted-foreground">Pay to platform UPI: <strong className="text-foreground">{sub.superAdminUpi}</strong> ({sub.superAdminPayee})</p>
+          {sub?.superAdminUpi ? (
+            <p className="text-sm text-muted-foreground">All plan payments go to the platform UPI: <strong className="text-foreground">{sub.superAdminUpi}</strong> ({sub.superAdminPayee})</p>
+          ) : (
+            <p className="text-sm rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2">
+              Platform UPI is not configured yet — you cannot pay for a plan right now. Please contact the platform admin.
+            </p>
           )}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-2">
             {sub?.plans.filter((p) => p.pricePaise > 0).map((p) => (
@@ -1116,16 +1146,40 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
       </Card>
 
       <Dialog open={!!payPlan} onOpenChange={(v) => !v && setPayPlan(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Pay for {payPlan?.name}</DialogTitle>
+            <DialogTitle>Pay for {payPlan?.name} — ₹{payPlan ? (payPlan.pricePaise / 100).toFixed(0) : ''}</DialogTitle>
             <DialogDescription>
-              Amount ₹{payPlan ? (payPlan.pricePaise / 100).toFixed(0) : ''} — pay to {sub?.superAdminUpi} from any UPI app, then enter the UTR here.
-              The platform admin verifies it before your plan activates.
+              This payment goes directly to the platform admin&apos;s UPI. Scan the QR with any UPI app (GPay / PhonePe / Paytm), then enter the UTR below. The platform admin verifies it before your plan activates.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <div className="space-y-1"><Label>UTR / reference</Label><Input value={utr} onChange={(e) => setUtr(e.target.value.toUpperCase())} /></div>
+          <div className="space-y-3">
+            {payQrErr && (
+              <p className="text-sm rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2">{payQrErr}</p>
+            )}
+            {payQr && (
+              <div className="flex flex-col items-center gap-2 rounded-lg border bg-white p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={payQr.dataUrl} alt={`Scan to pay ₹${(payQr.amountPaise / 100).toFixed(0)} to ${payQr.vpa}`} className="h-44 w-44" />
+                <p className="text-xs text-muted-foreground text-center">
+                  Paying <strong className="text-foreground">{payQr.payee}</strong> · {payQr.vpa}
+                </p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <Button size="sm" asChild>
+                    <a href={payQr.payload}>
+                      <QrCode className="h-4 w-4 mr-1.5" aria-hidden /> Open in UPI app
+                    </a>
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={copyPlatformUpi}>
+                    <Check className="h-4 w-4 mr-1.5" aria-hidden /> Copy UPI ID
+                  </Button>
+                </div>
+              </div>
+            )}
+            {!payQr && !payQrErr && (
+              <div className="h-44 w-44 mx-auto rounded-lg border bg-muted animate-pulse" aria-hidden />
+            )}
+            <div className="space-y-1"><Label>UTR / reference</Label><Input value={utr} onChange={(e) => setUtr(e.target.value.toUpperCase())} placeholder="12-digit number from your UPI app" /></div>
             <div className="space-y-1"><Label>Payer name (optional)</Label><Input value={payerName} onChange={(e) => setPayerName(e.target.value)} /></div>
           </div>
           <DialogFooter>

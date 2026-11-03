@@ -9,6 +9,18 @@ import { audit } from '@/lib/audit'
 import { orderNumber } from '@/lib/api'
 import { fileUrl } from '@/lib/storage'
 import { settings } from '@/lib/settings'
+import { sendOrderAlertWhatsApp, waConfigured } from '@/lib/whatsapp'
+
+/** Fire-and-forget WhatsApp owner alert — never blocks or fails the order flow. */
+function ownerAlert(
+  shop: { whatsappNumber: string | null },
+  orderNumber: string,
+  statusText: string,
+  note: string
+): void {
+  if (!waConfigured() || !shop.whatsappNumber) return
+  void sendOrderAlertWhatsApp(shop.whatsappNumber, orderNumber, statusText, note).catch(() => {})
+}
 
 interface CreateOrderInput {
   shopId: string
@@ -155,6 +167,8 @@ export async function createOrder(input: CreateOrderInput) {
     ip: input.ip,
   })
 
+  ownerAlert(shop, order.orderNumber, 'New order received', `Amount ₹${(total / 100).toFixed(2)} — awaiting UPI payment`)
+
   return order
 }
 
@@ -194,6 +208,9 @@ export async function submitUtr(orderId: string, utr: string, payerName?: string
     ip,
   })
   void updated
+
+  const shopForWa = await db.shop.findUnique({ where: { id: payment.shopId }, select: { whatsappNumber: true } })
+  if (shopForWa) ownerAlert(shopForWa, payment.order.orderNumber, 'UTR submitted — verify needed', `UTR ${utr}`)
 }
 
 export async function verifyPayment(
@@ -235,6 +252,8 @@ export async function verifyPayment(
     await db.notification.create({
       data: { shopId: payment.shopId, audience: 'SHOP', title: `Payment verified — ${payment.order.orderNumber}`, body: 'Print jobs have been queued to your connector' },
     })
+    const shopForWa = await db.shop.findUnique({ where: { id: payment.shopId }, select: { whatsappNumber: true } })
+    if (shopForWa) ownerAlert(shopForWa, payment.order.orderNumber, 'Payment verified', 'Print jobs queued to your connector')
   }
   await audit({
     shopId: payment.shopId,

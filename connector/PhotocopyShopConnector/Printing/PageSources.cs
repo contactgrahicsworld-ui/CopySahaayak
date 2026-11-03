@@ -24,7 +24,9 @@ public interface IPrintPageSource : IDisposable
 /// </summary>
 public sealed class PdfPageSource : IPrintPageSource
 {
-    private const float RenderDpi = 220f;
+    // 300 DPI: crisp text on typical 600 DPI office printers while one A4 page
+    // stays ~35 MB in transient memory (rendered and disposed page by page).
+    private const float RenderDpi = 300f;
 
     private readonly Stream _stream;
     private readonly bool _grayscale;

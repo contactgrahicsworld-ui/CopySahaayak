@@ -131,6 +131,14 @@ export const setupSchema = z.object({
   email: z.string().trim().email().max(120),
   password: newPasswordSchema,
   phone: z.string().trim().max(20).optional(),
+  // Platform UPI ID where all shop-owner plan/subscription payments are collected.
+  upiVpa: z
+    .string()
+    .trim()
+    .regex(/^[\w.\-]{2,60}@[a-zA-Z]{2,30}$/, 'Looks like name@bank (UPI ID)')
+    .optional()
+    .or(z.literal('')),
+  upiPayeeName: z.string().trim().max(60).optional(),
 })
 
 export const registerSchema = z.object({

@@ -108,10 +108,27 @@ export default function Home() {
       </section>
 
       <footer className="mt-auto border-t">
-        <div className="container mx-auto px-4 py-6 text-sm text-muted-foreground flex flex-col sm:flex-row justify-between gap-2">
-          <span>CopySahaayak — Photocopy Shop Automation SaaS</span>
-          <span>UPI payments verified manually · No gateway · PostgreSQL-ready multi-tenant architecture</span>
+        <div className="container mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">CopySahaayak — Photocopy Shop Automation SaaS</span>
+          <nav className="flex items-center gap-2 flex-wrap justify-center">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/download">
+                <Download className="h-4 w-4 mr-1" aria-hidden /> Connector
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <a href="/manual/copysahaayak-user-manual-hi.pdf" target="_blank" rel="noopener">User Manual (हिंदी)</a>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/super">
+                <ShieldCheck className="h-4 w-4 mr-1" aria-hidden /> Super Admin
+              </Link>
+            </Button>
+          </nav>
         </div>
+        <p className="container mx-auto px-4 pb-4 text-xs text-muted-foreground text-center sm:text-left">
+          UPI payments verified manually · No gateway · Multi-tenant architecture
+        </p>
       </footer>
     </main>
   )

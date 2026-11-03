@@ -43,6 +43,21 @@ export async function POST(req: Request) {
           shopId: null,
         },
       })
+      // Persist the platform UPI where all shop-owner plan payments will be
+      // collected — captured at first-run so subscription billing works from day one.
+      if (body.upiVpa) {
+        await db.platformSetting.upsert({
+          where: { key: 'super_admin_upi_vpa' },
+          create: { key: 'super_admin_upi_vpa', value: body.upiVpa },
+          update: { value: body.upiVpa },
+        })
+        const payee = body.upiPayeeName?.trim() || body.name
+        await db.platformSetting.upsert({
+          where: { key: 'super_admin_payee_name' },
+          create: { key: 'super_admin_payee_name', value: payee },
+          update: { value: payee },
+        })
+      }
       await ensureSupabaseAuthUser(email) // enables email OTP password reset (best effort)
       await audit({ actorType: 'USER', userId: user.id, action: 'PLATFORM_SETUP_COMPLETED', entity: 'User', entityId: user.id, ip: getClientIp(req) })
       return jsonOk({ ok: true })

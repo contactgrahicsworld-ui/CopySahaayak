@@ -103,3 +103,42 @@ describe('helpers', () => {
     assert.notEqual(sha256('abc'), sha256('abd'))
   })
 })
+
+// ---- WhatsApp transport (env-gated, fail-soft) ----
+describe('normalizeWaPhone', () => {
+  test('bare 10-digit Indian number gets 91 prefix', async () => {
+    const { normalizeWaPhone } = await import('@/lib/whatsapp')
+    assert.equal(normalizeWaPhone('9876543210'), '919876543210')
+  })
+  test('0-prefix and 91-prefix and +91 forms normalize identically', async () => {
+    const { normalizeWaPhone } = await import('@/lib/whatsapp')
+    assert.equal(normalizeWaPhone('09876543210'), '919876543210')
+    assert.equal(normalizeWaPhone('919876543210'), '919876543210')
+    assert.equal(normalizeWaPhone('+91 98765 43210'), '919876543210')
+  })
+  test('garbage and short numbers are rejected as null', async () => {
+    const { normalizeWaPhone } = await import('@/lib/whatsapp')
+    assert.equal(normalizeWaPhone('abc'), null)
+    assert.equal(normalizeWaPhone('12345'), null)
+    assert.equal(normalizeWaPhone(''), null)
+    assert.equal(normalizeWaPhone(null), null)
+  })
+  test('sends are no-ops without env config (never throw)', async () => {
+    const { sendWhatsAppTemplate, waConfigured } = await import('@/lib/whatsapp')
+    delete process.env.WHATSAPP_TOKEN
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID
+    assert.equal(waConfigured(), false)
+    const res = await sendWhatsAppTemplate('9876543210', 'otp_code', ['123456'])
+    assert.equal(res.ok, false)
+    assert.equal(res.status, 'not-configured')
+  })
+  test('invalid phone reports invalid-phone even when configured', async () => {
+    const { sendWhatsAppTemplate } = await import('@/lib/whatsapp')
+    process.env.WHATSAPP_TOKEN = 'test-token'
+    process.env.WHATSAPP_PHONE_NUMBER_ID = '123'
+    const res = await sendWhatsAppTemplate('not-a-phone', 'otp_code', ['1'])
+    assert.equal(res.status, 'invalid-phone')
+    delete process.env.WHATSAPP_TOKEN
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID
+  })
+})

@@ -673,9 +673,13 @@ function PlatformSettingsTab() {
     }
   }
 
-  const fields: Array<{ key: string; label: string }> = [
+  const fields: Array<{ key: string; label: string; hint?: string }> = [
     { key: 'platform_name', label: 'Platform name' },
-    { key: 'super_admin_upi_vpa', label: 'Platform UPI ID (subscription payments)' },
+    {
+      key: 'super_admin_upi_vpa',
+      label: 'Platform UPI ID (subscription payments)',
+      hint: 'Every shop-owner plan payment is collected in this UPI account. Owners see it as text + a scan-to-pay QR in their dashboard.',
+    },
     { key: 'super_admin_payee_name', label: 'Platform payee name' },
     { key: 'support_phone', label: 'Support phone' },
     { key: 'order_prefix', label: 'Order number prefix' },
@@ -685,11 +689,17 @@ function PlatformSettingsTab() {
     <Card className="max-w-xl">
       <CardHeader className="pb-2"><CardTitle className="text-base">Platform settings</CardTitle></CardHeader>
       <CardContent>
+        {!form.super_admin_upi_vpa && (
+          <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2 text-sm">
+            Set your UPI ID below — until then shop owners cannot pay for plans.
+          </p>
+        )}
         <form onSubmit={save} className="space-y-3">
           {fields.map((f) => (
             <div key={f.key} className="space-y-1">
               <Label>{f.label}</Label>
               <Input value={form[f.key] || ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+              {f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
             </div>
           ))}
           <Button type="submit" disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Save settings</Button>

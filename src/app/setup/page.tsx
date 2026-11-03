@@ -20,6 +20,8 @@ export default function SetupPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
+  const [upiVpa, setUpiVpa] = useState('')
+  const [upiPayeeName, setUpiPayeeName] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function SetupPage() {
       const res = await fetch('/api/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, phone: phone || undefined }),
+        body: JSON.stringify({ name, email, password, phone: phone || undefined, upiVpa: upiVpa || undefined, upiPayeeName: upiPayeeName || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Setup failed')
@@ -96,6 +98,15 @@ export default function SetupPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="8+ chars, letters and digits" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="upi">Your UPI ID (platform earnings)</Label>
+                <Input id="upi" value={upiVpa} onChange={(e) => setUpiVpa(e.target.value)} placeholder="name@okhdfcbank" />
+                <p className="text-xs text-muted-foreground">Shop owners pay for their plans here — every subscription payment lands in this UPI account. You can change it later in Super Admin → Settings.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="payee">UPI payee name (shown in payer apps)</Label>
+                <Input id="payee" maxLength={60} value={upiPayeeName} onChange={(e) => setUpiPayeeName(e.target.value)} placeholder="e.g. CopySahaayak Platforms" />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Create Super Admin

@@ -38,12 +38,22 @@ export interface SupabaseUser {
 }
 
 export async function adminFindUserByEmail(email: string): Promise<SupabaseUser | null> {
-  const res = await sbFetch(`/auth/v1/admin/users?page=1&per_page=50&email=${encodeURIComponent(email.toLowerCase())}`)
-  if (res.status !== 200) return null
-  const data = res.json() as { users?: Array<{ id: string; email: string }> } | null
-  const users = data?.users || []
-  const hit = users.find((u) => (u.email || '').toLowerCase() === email.toLowerCase())
-  return hit ? { id: hit.id, email: hit.email } : null
+  // NOTE: current Supabase (GoTrue) versions silently IGNORE the `email` filter
+  // param on the list endpoint — it returns the first page of ALL users. Relying
+  // on it made lookups fail once >50 mirror users existed (the target user fell
+  // beyond page 1 and ensureSupabaseAuthUser then 502'd every OTP request).
+  // Paginate with per_page=200 (GoTrue max) and match locally instead.
+  const needle = email.toLowerCase()
+  for (let page = 1; page <= 20; page++) {
+    const res = await sbFetch(`/auth/v1/admin/users?per_page=200&page=${page}`)
+    if (res.status !== 200) return null
+    const data = res.json() as { users?: Array<{ id: string; email: string }> } | null
+    const users = data?.users || []
+    const hit = users.find((u) => (u.email || '').toLowerCase() === needle)
+    if (hit) return { id: hit.id, email: hit.email }
+    if (users.length < 200) return null
+  }
+  return null
 }
 
 export async function adminCreateUser(email: string): Promise<SupabaseUser> {

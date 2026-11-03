@@ -53,6 +53,11 @@ export async function POST(req: Request) {
         } catch {
           serviceDown = true
         }
+        // Fallback: WhatsApp-delivered app-issued codes (verifyAppOtp) when the
+        // email code did not match — keeps both channels valid without weakening either.
+        if (!codeOk && !serviceDown) {
+          codeOk = await verifyAppOtp(email, body.code).catch(() => false)
+        }
       } else if (mailTransport === 'resend' || mailTransport === 'mock') {
         codeOk = await verifyAppOtp(email, body.code)
       } else {

@@ -7,6 +7,7 @@ import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { forgotPasswordSchema } from '@/lib/validation'
 import { ensureSupabaseAuthUser, sendLoginOtp } from '@/lib/supabase'
 import { mailTransport, sendMail, otpEmailTemplate, generateOtp, hashOtp } from '@/lib/mailer'
+import { waConfigured, sendOtpWhatsApp } from '@/lib/whatsapp'
 import { RATE_LIMITS } from '@/lib/rate-limit'
 import { getClientIp } from '@/lib/security'
 import { audit } from '@/lib/audit'
@@ -60,8 +61,29 @@ export async function POST(req: Request) {
         )
       }
 
-      await audit({ shopId: user.shopId, actorType: 'SYSTEM', action: 'PASSWORD_RESET_REQUESTED', meta: { email }, ip: getClientIp(req) })
-      return jsonOk({ ok: true, sent: true })
+      // WhatsApp OTP: when the Cloud API is configured and the user has a phone,
+      // also deliver an app-issued code over WhatsApp (in addition to email).
+      // The reset endpoint falls back to app-OTP verification for these codes.
+      let whatsapp: string = waConfigured() ? 'skipped-no-phone' : 'not-configured'
+      if (waConfigured() && user.phone) {
+        const code = generateOtp()
+        const wa = await sendOtpWhatsApp(user.phone, code)
+        if (wa.ok) {
+          whatsapp = 'sent'
+          await db.passwordResetOtp.updateMany({
+            where: { email, consumedAt: null },
+            data: { consumedAt: new Date() },
+          })
+          await db.passwordResetOtp.create({
+            data: { email, codeHash: hashOtp(code), expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+          })
+        } else {
+          whatsapp = `failed: ${(wa.detail || wa.status).slice(0, 80)}`
+        }
+      }
+
+      await audit({ shopId: user.shopId, actorType: 'SYSTEM', action: 'PASSWORD_RESET_REQUESTED', meta: { email, whatsapp }, ip: getClientIp(req) })
+      return jsonOk({ ok: true, sent: true, whatsapp })
     }
   )
 }

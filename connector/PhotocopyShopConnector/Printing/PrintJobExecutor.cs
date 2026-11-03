@@ -78,6 +78,15 @@ public sealed class PrintJobExecutor
         printer.PrinterName = request.PrinterName;
         printer.Duplex = request.Duplex ? Duplex.Vertical : Duplex.Simplex;
 
+        // Force the driver colour mode to match the paid job. Many Windows drivers
+        // default to mono — without this a customer-paid COLOR order would silently
+        // come out B/W (and a B/W order could burn colour toner).
+        var wantsColor = string.Equals(request.ColorMode, "COLOR", StringComparison.OrdinalIgnoreCase);
+        if (printer.SupportsColor)
+        {
+            document.DefaultPageSettings.Color = wantsColor;
+        }
+
         // Use driver copies when supported; otherwise loop the pages in software.
         var driverCopies = request.Copies > 1 && printer.MaximumCopies > 1;
         if (driverCopies)

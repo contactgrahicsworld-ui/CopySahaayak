@@ -13,6 +13,7 @@
 import { db } from '@/lib/db'
 import { jsonOk, jsonError } from '@/lib/api'
 import { sendMail, mailTransport } from '@/lib/mailer'
+import { sendPlanExpiryWhatsApp, waConfigured } from '@/lib/whatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
     },
   })
 
-  const results: Array<{ shop: string; plan: string; daysLeft: number; inApp: boolean; email: string }> = []
+  const results: Array<{ shop: string; plan: string; daysLeft: number; inApp: boolean; email: string; whatsapp: string }> = []
 
   for (const sub of subs) {
     if (!sub.shop.isActive) continue
@@ -57,7 +58,7 @@ export async function GET(req: Request) {
       where: { shopId: sub.shopId, audience: 'SHOP', title: { contains: tag }, createdAt: { gte: startOfDay } },
     })
     if (dupe) {
-      results.push({ shop: sub.shop.name, plan: sub.plan.name, daysLeft, inApp: true, email: 'already-notified-today' })
+      results.push({ shop: sub.shop.name, plan: sub.plan.name, daysLeft, inApp: true, email: 'already-notified-today', whatsapp: 'already-notified-today' })
       continue
     }
 
@@ -92,13 +93,23 @@ export async function GET(req: Request) {
       emailStatus = 'mock-captured'
     }
 
-    results.push({ shop: sub.shop.name, plan: sub.plan.name, daysLeft, inApp: true, email: emailStatus })
+    let whatsappStatus = 'not-configured'
+    if (waConfigured()) {
+      if (!sub.shop.whatsappNumber) {
+        whatsappStatus = 'skipped-no-number'
+      } else {
+        const wa = await sendPlanExpiryWhatsApp(sub.shop.whatsappNumber, sub.shop.name, sub.plan.name, end, daysLeft)
+        whatsappStatus = wa.ok ? 'sent' : `failed: ${(wa.detail || wa.status).slice(0, 80)}`
+      }
+    }
+
+    results.push({ shop: sub.shop.name, plan: sub.plan.name, daysLeft, inApp: true, email: emailStatus, whatsapp: whatsappStatus })
   }
 
   return jsonOk({
     checked: subs.length,
     notified: results.length,
-    channels: { inApp: 'always', email: mailTransport === 'resend' ? 'resend' : 'not-configured', sms: 'not-configured', whatsapp: 'not-configured (wa.me links available in dashboard)' },
+    channels: { inApp: 'always', email: mailTransport === 'resend' ? 'resend' : 'not-configured', sms: 'not-configured', whatsapp: waConfigured() ? 'cloud-api-templates' : 'not-configured (wa.me links available in dashboard)' },
     results,
     ranAt: now.toISOString(),
   })
