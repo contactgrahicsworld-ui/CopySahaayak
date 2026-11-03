@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Download, MonitorCheck, TriangleAlert, Trash2 } from 'lucide-react'
+import { Download, MonitorCheck, TriangleAlert, Trash2, BookOpen } from 'lucide-react'
 
 export const metadata = { title: 'Windows Connector — CopySahaayak' }
 
@@ -37,6 +37,30 @@ export default function DownloadPage() {
             </a>
           </Button>
         </div>
+
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2"><BookOpen className="h-4 w-4" aria-hidden /> User Manual — Hindi (उपयोगकर्ता निर्देशिका)</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            <p className="mb-3">
+              Complete 10-page Hindi guide: customer QR ordering, UPI + UTR payment verification, WhatsApp status
+              updates, Windows connector installation (SmartScreen-safe), password reset options and FAQ.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button asChild variant="outline" size="sm">
+                <a href="/manual/copysahaayak-user-manual-hi.pdf" target="_blank" rel="noopener noreferrer">
+                  <BookOpen className="h-4 w-4 mr-2" aria-hidden /> View online
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href="/manual/copysahaayak-user-manual-hi.pdf" download>
+                  <Download className="h-4 w-4 mr-2" aria-hidden /> Download PDF
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <Alert className="mb-8">
           <TriangleAlert className="h-4 w-4" />
