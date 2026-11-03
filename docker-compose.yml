@@ -1,0 +1,59 @@
+# Production stack: SaaS app + PostgreSQL + reverse proxy (Caddy auto-HTTPS).
+# Usage:
+#   cp .env.example .env  (fill secrets)
+#   docker compose up -d --build
+#   docker compose exec app bun run db:deploy   # migrations
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-copysahaayak}
+      POSTGRES_USER: ${POSTGRES_USER:-pcs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./scripts/backup-db.sh:/usr/local/bin/backup-db:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-pcs} -d ${POSTGRES_DB:-copysahaayak}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pcs}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-copysahaayak}
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET in .env}
+      DATA_DIR: /app/private-data
+      CONNECTOR_SETUP_EXE: /app/private-data/connector/PhotocopyShopConnector-Setup.exe
+    volumes:
+      - app-data:/app/private-data
+    expose:
+      - '3000'
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+
+volumes:
+  db-data:
+  app-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,20 @@
+# Vercel deployment excludes — heavy local artifacts never needed server-side
+# (leading slash = anchored to repo root, so src/app/download is NOT matched)
+/connector/publish
+/connector/PhotocopyShopConnector/bin
+/connector/PhotocopyShopConnector/obj
+/connector/installer/PhotocopyShopConnector-Setup.exe
+/download
+/db
+/private-data
+/upload
+/agent-ctx
+/examples
+/mini-services
+/tests
+/docs
+/scripts
+*.exe
+node_modules
+.git
+.vercel

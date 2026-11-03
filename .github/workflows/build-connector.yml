@@ -1,0 +1,95 @@
+name: Build Windows Connector
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "connector/**"
+      - "scripts/build-connector.sh"
+      - ".github/workflows/build-connector.yml"
+    tags:
+      - "connector-v*"
+      - "v*.*.*"
+  pull_request:
+    paths:
+      - "connector/**"
+      - ".github/workflows/build-connector.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build connector (win-x64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: Publish (self-contained single file)
+        run: >
+          dotnet publish connector/PhotocopyShopConnector
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:PublishTrimmed=false
+          -o connector/publish
+
+      - name: Verify publish output
+        run: |
+          $exe = "connector/publish/PhotocopyShopConnector.exe"
+          if (-not (Test-Path $exe)) { throw "Publish output missing: $exe" }
+          Get-Item $exe | Select-Object Name, Length
+
+      - name: Build installer (NSIS)
+        run: |
+          $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $makensis)) { throw "makensis not found at $makensis" }
+          Push-Location connector/installer
+          & $makensis -V2 PhotocopyShopConnector.nsi
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { exit $code }
+
+      - name: Collect artifacts
+        run: |
+          New-Item -ItemType Directory -Force -Path download/connector | Out-Null
+          Copy-Item connector/installer/PhotocopyShopConnector-Setup.exe download/connector/
+          Copy-Item connector/publish/PhotocopyShopConnector.exe download/connector/PhotocopyShopConnector-portable.exe
+          Get-FileHash download/connector/*.exe -Algorithm SHA256 | Format-Table -AutoSize
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotocopyShopConnector-windows
+          path: |
+            download/connector/PhotocopyShopConnector-Setup.exe
+            download/connector/PhotocopyShopConnector-portable.exe
+          if-no-files-found: error
+
+      - name: Create GitHub release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = @(
+            "download/connector/PhotocopyShopConnector-Setup.exe",
+            "download/connector/PhotocopyShopConnector-portable.exe"
+          )
+          $existing = gh release view $env:GITHUB_REF_NAME --json id 2>$null
+          if ($existing) {
+            gh release upload $env:GITHUB_REF_NAME $files --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME $files `
+              --title "Photocopy Shop Connector $($env:GITHUB_REF_NAME)" `
+              --generate-notes
+          }
