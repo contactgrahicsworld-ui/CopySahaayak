@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       if (mailTransport === 'supabase') {
         const mirror = await ensureSupabaseAuthUser(email)
         if (!mirror) {
-          return jsonError(502, 'Password reset is temporarily unavailable. Please try again in a few minutes.')
+          return jsonError(502, 'Password reset email is temporarily unavailable. A Super Admin can reset any password from Users in the platform dashboard — or try again in a few minutes.')
         }
         const result = await sendLoginOtp(email)
         if (!result.sent) {

@@ -51,8 +51,8 @@ story.append(Paragraph('2. What was delivered', h2))
 rows = [
     ('A. Live SaaS web application', 'Next.js 16 + React 19 + TypeScript + Prisma. Three role surfaces: customer '
      'ordering (/s/{shop}), Shop Admin (/admin, 7 modules), Super Admin (/super, 6 modules). Guest customers — no '
-     'registration. Running now at the preview URL; login: owner@sharmadigitalpress.in / Shop@12345, '
-     'super@copysahaayak.in / Super@12345.'),
+     'registration. No credentials are predefined: the first Super Admin is created once via /setup and shops '
+     'register via /register.'),
     ('B. Windows installer', 'PhotocopyShopConnector-Setup.exe — real NSIS-installer (PE32), 49.8 MB, copies a '
      'self-contained .NET 8 WinForms tray app (156 MB, no runtime downloads), registers photocopyconnector:// protocol, '
      'Add/Remove Programs entry + uninstaller. SHA-256 95575ab2…848d1cc0 (full value in delivery package). '

@@ -33,7 +33,7 @@ export async function GET(req: Request) {
             duplex: true,
             pageCount: true,
             totalPaise: true,
-            document: { select: { originalName: true } },
+            document: { select: { id: true, originalName: true } },
           },
         },
         printJobs: { select: { id: true, status: true } },

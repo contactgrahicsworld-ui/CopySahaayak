@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
@@ -27,6 +28,7 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
   const { toast } = useToast()
   const router = useRouter()
   const [tab, setTab] = useState('overview')
+  const [pwOpen, setPwOpen] = useState(false)
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -45,22 +47,27 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
               <p className="text-[11px] text-muted-foreground truncate">{user.email} · /s/{shop.slug}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={logout}>
-            <LogOut className="h-4 w-4 mr-1" aria-hidden /> Sign out
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => setPwOpen(true)} aria-label="Change password">
+              <KeyRound className="h-4 w-4 sm:mr-1" aria-hidden /> <span className="hidden sm:inline">Password</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={logout}>
+              <LogOut className="h-4 w-4 sm:mr-1" aria-hidden /> <span className="hidden sm:inline">Sign out</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-3 sm:px-4 py-4">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-1 mb-4">
-            <TabsTrigger value="overview"><LayoutDashboard className="h-4 w-4 mr-1" aria-hidden /> Overview</TabsTrigger>
-            <TabsTrigger value="orders"><ClipboardList className="h-4 w-4 mr-1" aria-hidden /> Orders</TabsTrigger>
-            <TabsTrigger value="payments"><BadgeCheck className="h-4 w-4 mr-1" aria-hidden /> Payments</TabsTrigger>
-            <TabsTrigger value="printers"><Printer className="h-4 w-4 mr-1" aria-hidden /> Printers & Devices</TabsTrigger>
-            <TabsTrigger value="pricing"><IndianRupee className="h-4 w-4 mr-1" aria-hidden /> Pricing</TabsTrigger>
-            <TabsTrigger value="reports"><BarChart3 className="h-4 w-4 mr-1" aria-hidden /> Reports</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1" aria-hidden /> Settings</TabsTrigger>
+          <TabsList className="w-full h-auto flex-nowrap overflow-x-auto no-scrollbar justify-start gap-1 mb-4">
+            <TabsTrigger value="overview" className="shrink-0"><LayoutDashboard className="h-4 w-4 mr-1" aria-hidden /> Overview</TabsTrigger>
+            <TabsTrigger value="orders" className="shrink-0"><ClipboardList className="h-4 w-4 mr-1" aria-hidden /> Orders</TabsTrigger>
+            <TabsTrigger value="payments" className="shrink-0"><BadgeCheck className="h-4 w-4 mr-1" aria-hidden /> Payments</TabsTrigger>
+            <TabsTrigger value="printers" className="shrink-0"><Printer className="h-4 w-4 mr-1" aria-hidden /> Printers</TabsTrigger>
+            <TabsTrigger value="pricing" className="shrink-0"><IndianRupee className="h-4 w-4 mr-1" aria-hidden /> Pricing</TabsTrigger>
+            <TabsTrigger value="reports" className="shrink-0"><BarChart3 className="h-4 w-4 mr-1" aria-hidden /> Reports</TabsTrigger>
+            <TabsTrigger value="settings" className="shrink-0"><Settings className="h-4 w-4 mr-1" aria-hidden /> Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview"><OverviewTab onGoTo={setTab} /></TabsContent>
@@ -72,6 +79,8 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
           <TabsContent value="settings"><SettingsTab shop={shop} /></TabsContent>
         </Tabs>
       </div>
+
+      <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
     </main>
   )
 }
@@ -156,7 +165,7 @@ interface OrderRow {
   customerPhone?: string
   createdAt: string
   payment?: { status: string; utr?: string; rejectionReason?: string }
-  items: Array<{ id: string; colorMode: string; paperSize: string; copies: number; duplex: boolean; pageCount: number; totalPaise: number; document: { originalName: string } }>
+  items: Array<{ id: string; colorMode: string; paperSize: string; copies: number; duplex: boolean; pageCount: number; totalPaise: number; document: { id: string; originalName: string } }>
   printJobs: Array<{ id: string; status: string }>
 }
 
@@ -221,8 +230,8 @@ function OrdersTab() {
             ))}
           </SelectContent>
         </Select>
-        <Input placeholder="Search order no / name / phone" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4" aria-hidden /></Button>
+        <Input placeholder="Search order no / name / phone" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:max-w-xs" />
+        <Button variant="outline" size="sm" onClick={load} aria-label="Refresh"><RefreshCw className="h-4 w-4" aria-hidden /></Button>
       </div>
 
       {loading && orders.length === 0 ? (
@@ -257,7 +266,7 @@ function OrdersTab() {
                       <div key={it.id} className="flex flex-wrap items-center justify-between gap-2">
                         <span className="flex items-center gap-2 min-w-0">
                           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                          <button className="underline truncate" onClick={() => setPreviewDoc({ id: it.document ? '' : '', name: it.document.originalName })}>
+                          <button className="underline truncate" onClick={() => setPreviewDoc({ id: it.document.id, name: it.document.originalName })}>
                             {it.document.originalName}
                           </button>
                           <span className="text-xs text-muted-foreground">
@@ -293,12 +302,12 @@ function OrdersTab() {
       )}
 
       <Dialog open={!!previewDoc} onOpenChange={(v) => !v && setPreviewDoc(null)}>
-        <DialogContent className="max-w-3xl h-[80vh]">
+        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-sm">{previewDoc?.name}</DialogTitle>
+            <DialogTitle className="text-sm pr-6 break-all">{previewDoc?.name}</DialogTitle>
           </DialogHeader>
           {previewDoc && (
-            <iframe src={`/api/admin/file/${previewDoc.id}`} className="w-full flex-1 rounded-md border" title={`Preview of ${previewDoc.name}`} />
+            <iframe src={`/api/admin/file/${previewDoc.id}`} className="w-full h-[60vh] sm:h-[70vh] rounded-md border" title={`Preview of ${previewDoc.name}`} />
           )}
         </DialogContent>
       </Dialog>
@@ -519,12 +528,12 @@ function PrintersTab() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-          <div>
+        <CardHeader className="pb-2 flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+          <div className="min-w-0">
             <CardTitle className="text-base">Windows connectors</CardTitle>
             <CardDescription>One connector per shop PC. Pair with a 6-character code.</CardDescription>
           </div>
-          <Button size="sm" onClick={createPairing}><Plus className="h-4 w-4 mr-1" aria-hidden /> Pair connector</Button>
+          <Button size="sm" className="shrink-0" onClick={createPairing}><Plus className="h-4 w-4 mr-1" aria-hidden /> Pair connector</Button>
         </CardHeader>
         <CardContent className="space-y-2">
           {loading ? (
@@ -600,7 +609,7 @@ function PrintersTab() {
             </DialogDescription>
           </DialogHeader>
           <div className="text-center space-y-3 py-2">
-            <p className="text-4xl font-mono font-bold tracking-widest">{pairing?.code}</p>
+            <p className="text-3xl sm:text-4xl font-mono font-bold tracking-widest">{pairing?.code}</p>
             <p className="text-xs text-muted-foreground">Expires {pairing ? new Date(pairing.expiresAt).toLocaleTimeString('en-IN') : ''}</p>
             <a href={pairing?.deepLink} className="text-xs underline break-all">{pairing?.deepLink}</a>
           </div>

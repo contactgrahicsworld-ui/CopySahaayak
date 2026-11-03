@@ -251,22 +251,22 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
           return (
             <Card key={item.key}>
               <CardContent className="pt-4 space-y-3">
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2">
                   {item.mimeType === 'application/pdf' ? (
                     <FileText className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden />
                   ) : (
                     <ImageIcon className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{item.fileName}</p>
+                    <p className="text-sm font-medium break-all">{item.fileName}</p>
                     <p className="text-xs text-muted-foreground">
                       {item.pageCount} page{item.pageCount > 1 ? 's' : ''} · {(item.sizeBytes / 1024 / 1024).toFixed(2)} MB
                     </p>
                   </div>
-                  <a href={item.previewUrl} target="_blank" rel="noreferrer" className="text-xs underline text-muted-foreground">
+                  <a href={item.previewUrl} target="_blank" rel="noreferrer" className="text-xs underline text-muted-foreground shrink-0 py-1">
                     Preview
                   </a>
-                  <Button variant="ghost" size="icon" aria-label="Remove file" onClick={() => setItems((p) => p.filter((x) => x.key !== item.key))}>
+                  <Button variant="ghost" size="icon" aria-label="Remove file" className="shrink-0" onClick={() => setItems((p) => p.filter((x) => x.key !== item.key))}>
                     <Trash2 className="h-4 w-4" aria-hidden />
                   </Button>
                 </div>
@@ -294,14 +294,14 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
 
                 <div>
                   <Label className="text-xs text-muted-foreground">Paper size</Label>
-                  <div className="grid grid-cols-4 gap-2 mt-1">
+                  <div className="grid grid-cols-4 gap-1.5 mt-1">
                     {SIZES.map((ps) => (
                       <button
                         key={ps}
                         type="button"
                         disabled={!ruleExists(item.colorMode, ps)}
                         onClick={() => patchItem(item.key, { paperSize: ps })}
-                        className={`rounded-lg border px-1 py-2.5 text-sm font-medium disabled:opacity-40 ${
+                        className={`rounded-lg border px-1 py-2.5 text-xs sm:text-sm font-medium disabled:opacity-40 ${
                           item.paperSize === ps ? 'border-primary bg-primary text-primary-foreground' : 'bg-background'
                         }`}
                       >
@@ -376,7 +376,7 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
           <Card>
             <CardContent className="pt-4 space-y-3">
               <p className="text-sm font-medium">Your details (optional — helps the shop reach you)</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label htmlFor="cname" className="text-xs">Name</Label>
                   <Input id="cname" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" />
@@ -392,18 +392,19 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
       </div>
 
       {items.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <div className="container max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Total ({items.length} file{items.length > 1 ? 's' : ''})</p>
-              <p className="text-xl font-bold flex items-center">
-                <IndianRupee className="h-5 w-5" aria-hidden />
+        <div className="fixed bottom-0 inset-x-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-safe">
+          <div className="container max-w-lg mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] leading-tight text-muted-foreground">Total ({items.length} file{items.length > 1 ? 's' : ''})</p>
+              <p className="text-lg sm:text-xl font-bold flex items-center">
+                <IndianRupee className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
                 {(total / 100).toFixed(2)}
               </p>
             </div>
-            <Button size="lg" onClick={placeOrder} disabled={placing || missingRules}>
-              {placing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden /> : <Printer className="h-4 w-4 mr-2" aria-hidden />}
-              Place order & pay
+            <Button size="lg" className="shrink-0 px-3 sm:px-6 text-sm sm:text-base" onClick={placeOrder} disabled={placing || missingRules}>
+              {placing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" aria-hidden /> : <Printer className="h-4 w-4 mr-1.5" aria-hidden />}
+              <span className="hidden min-[380px]:inline">Place order & pay</span>
+              <span className="min-[380px]:hidden">Order & pay</span>
             </Button>
           </div>
         </div>
@@ -452,7 +453,7 @@ function PayStage({
             </div>
             {order.qrDataUrl && (
               <div className="mx-auto bg-white p-2 rounded-xl w-fit border">
-                <img src={order.qrDataUrl} alt={`UPI QR code to pay ₹${(order.totalPaise / 100).toFixed(2)} to ${order.upi.payeeName}`} className="h-56 w-56" />
+                <img src={order.qrDataUrl} alt={`UPI QR code to pay ₹${(order.totalPaise / 100).toFixed(2)} to ${order.upi.payeeName}`} className="h-44 w-44 sm:h-56 sm:w-56" />
               </div>
             )}
             <p className="text-sm text-muted-foreground">

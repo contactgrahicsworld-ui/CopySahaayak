@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
@@ -21,6 +22,7 @@ import {
 export function SuperDashboard({ user }: { user: { name: string; email: string } }) {
   const router = useRouter()
   const [tab, setTab] = useState('overview')
+  const [pwOpen, setPwOpen] = useState(false)
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -31,25 +33,32 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
   return (
     <main className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-sm">CopySahaayak Platform</p>
-            <p className="text-[11px] text-muted-foreground">{user.email} · Super Admin</p>
+        <div className="container mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-semibold text-sm truncate">CopySahaayak Platform</p>
+            <p className="text-[11px] text-muted-foreground truncate">{user.email} · Super Admin</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={logout}><LogOut className="h-4 w-4 mr-1" aria-hidden /> Sign out</Button>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => setPwOpen(true)} aria-label="Change password">
+              <KeyRound className="h-4 w-4 sm:mr-1" aria-hidden /> <span className="hidden sm:inline">Password</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={logout}>
+              <LogOut className="h-4 w-4 sm:mr-1" aria-hidden /> <span className="hidden sm:inline">Sign out</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-3 sm:px-4 py-4">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-1 mb-4">
-            <TabsTrigger value="overview"><LayoutDashboard className="h-4 w-4 mr-1" aria-hidden /> Overview</TabsTrigger>
-            <TabsTrigger value="shops"><Store className="h-4 w-4 mr-1" aria-hidden /> Shops</TabsTrigger>
-            <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" aria-hidden /> Users</TabsTrigger>
-            <TabsTrigger value="subs"><BadgeCheck className="h-4 w-4 mr-1" aria-hidden /> Subscriptions</TabsTrigger>
-            <TabsTrigger value="plans"><Layers className="h-4 w-4 mr-1" aria-hidden /> Plans</TabsTrigger>
-            <TabsTrigger value="audit"><ScrollText className="h-4 w-4 mr-1" aria-hidden /> Audit log</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1" aria-hidden /> Settings</TabsTrigger>
+          <TabsList className="w-full h-auto flex-nowrap overflow-x-auto no-scrollbar justify-start gap-1 mb-4">
+            <TabsTrigger value="overview" className="shrink-0"><LayoutDashboard className="h-4 w-4 mr-1" aria-hidden /> Overview</TabsTrigger>
+            <TabsTrigger value="shops" className="shrink-0"><Store className="h-4 w-4 mr-1" aria-hidden /> Shops</TabsTrigger>
+            <TabsTrigger value="users" className="shrink-0"><Users className="h-4 w-4 mr-1" aria-hidden /> Users</TabsTrigger>
+            <TabsTrigger value="subs" className="shrink-0"><BadgeCheck className="h-4 w-4 mr-1" aria-hidden /> Subs</TabsTrigger>
+            <TabsTrigger value="plans" className="shrink-0"><Layers className="h-4 w-4 mr-1" aria-hidden /> Plans</TabsTrigger>
+            <TabsTrigger value="audit" className="shrink-0"><ScrollText className="h-4 w-4 mr-1" aria-hidden /> Audit</TabsTrigger>
+            <TabsTrigger value="settings" className="shrink-0"><Settings className="h-4 w-4 mr-1" aria-hidden /> Settings</TabsTrigger>
           </TabsList>
           <TabsContent value="overview"><OverviewTab /></TabsContent>
           <TabsContent value="shops"><ShopsTab /></TabsContent>
@@ -60,6 +69,8 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
           <TabsContent value="settings"><PlatformSettingsTab /></TabsContent>
         </Tabs>
       </div>
+
+      <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
     </main>
   )
 }
@@ -210,9 +221,9 @@ function ShopsTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 items-center">
-        <Input placeholder="Search shops" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4" aria-hidden /></Button>
+      <div className="flex flex-wrap gap-2 items-center">
+        <Input placeholder="Search shops" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:max-w-xs" />
+        <Button variant="outline" size="sm" onClick={load} aria-label="Refresh"><RefreshCw className="h-4 w-4" aria-hidden /></Button>
         <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" aria-hidden /> Onboard shop</Button>
       </div>
 
@@ -253,7 +264,7 @@ function ShopsTab() {
           <DialogHeader><DialogTitle>Onboard a new shop</DialogTitle>
             <DialogDescription>Creates the shop, its ordering URL, owner login and default pricing.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1 col-span-2"><Label>Shop name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
             <div className="space-y-1"><Label>Owner name</Label><Input value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} /></div>
             <div className="space-y-1"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
@@ -343,8 +354,8 @@ function UsersTab() {
   return (
     <div className="space-y-3">
       <div className="flex gap-2 items-center">
-        <Input placeholder="Search users by email or name" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4" aria-hidden /></Button>
+        <Input placeholder="Search users by email or name" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:max-w-xs" />
+        <Button variant="outline" size="sm" onClick={load} aria-label="Refresh"><RefreshCw className="h-4 w-4" aria-hidden /></Button>
       </div>
       {loading ? (
         <CenterSpinner />
@@ -541,8 +552,8 @@ function PlansTab() {
     <div className="space-y-3">
       {plans.map((p) => (
         <Card key={p.id}>
-          <CardContent className="py-3 grid md:grid-cols-5 gap-2 items-end">
-            <div>
+          <CardContent className="py-3 grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+            <div className="col-span-2 md:col-span-1">
               <p className="font-semibold text-sm">{p.name}</p>
               <p className="text-xs text-muted-foreground">{p.code}</p>
             </div>
@@ -606,9 +617,9 @@ function AuditTab() {
         <CardDescription>Latest {logs.length} entries — filter by action keyword.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        <Input placeholder="Filter e.g. PAYMENT, DEVICE, LOGIN" value={action} onChange={(e) => setAction(e.target.value)} className="max-w-sm" />
-        <div className="max-h-[60vh] overflow-y-auto rounded border">
-          <table className="w-full text-xs">
+        <Input placeholder="Filter e.g. PAYMENT, DEVICE, LOGIN" value={action} onChange={(e) => setAction(e.target.value)} className="w-full sm:max-w-sm" />
+        <div className="max-h-[60vh] overflow-auto rounded border">
+          <table className="w-full min-w-[560px] text-xs">
             <thead className="bg-muted sticky top-0">
               <tr>
                 <th className="text-left p-2">Time</th>

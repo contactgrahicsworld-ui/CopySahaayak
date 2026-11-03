@@ -21,19 +21,19 @@ export default function Home() {
   return (
     <main className="min-h-screen flex flex-col">
       <header className="border-b">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="container mx-auto px-4 min-h-16 py-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 font-bold text-lg">
             <Printer className="h-5 w-5" aria-hidden />
             CopySahaayak
           </div>
-          <nav className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/register">Register your shop</Link>
+          <nav className="flex items-center gap-1.5 flex-wrap">
+            <Button asChild variant="ghost" size="sm" className="px-2.5">
+              <Link href="/register">Register</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/download">Windows Connector</Link>
+            <Button asChild variant="ghost" size="sm" className="hidden min-[420px]:inline-flex px-2.5">
+              <Link href="/download">Connector</Link>
             </Button>
-            <Button asChild size="sm">
+            <Button asChild size="sm" className="px-2.5">
               <Link href="/login">Sign in</Link>
             </Button>
           </nav>
@@ -51,10 +51,10 @@ export default function Home() {
             Windows connector prints the job automatically. No app downloads. No payment gateway. No commissions.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="w-full sm:w-auto">
               <Link href="/register">Start free — register your shop →</Link>
             </Button>
-            <Button asChild size="lg" variant="outline">
+            <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
               <Link href="/login">Shop & platform login</Link>
             </Button>
           </div>
@@ -99,9 +99,9 @@ export default function Home() {
             <h3 className="font-semibold text-lg">Running a shop?</h3>
             <p className="text-sm text-muted-foreground">Install the Windows connector, map your B/W and colour printers, and start receiving jobs.</p>
           </div>
-          <Button asChild size="lg">
+          <Button asChild size="lg" className="w-full sm:w-auto">
             <Link href="/download">
-              <Download className="h-4 w-4 mr-2" aria-hidden /> Download PhotocopyShopConnector-Setup.exe
+              <Download className="h-4 w-4 mr-2" aria-hidden /> Download connector for Windows
             </Link>
           </Button>
         </div>

@@ -72,3 +72,7 @@ nohup.out
 /connector/PhotocopyShopConnector/obj/
 /connector/installer/PhotocopyShopConnector-Setup.exe
 tool-results/
+
+# local-only credential artifacts (never commit)
+.bootstrap-super-pw
+*.pw.txt

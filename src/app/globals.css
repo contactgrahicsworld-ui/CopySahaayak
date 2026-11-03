@@ -119,4 +119,43 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Prevent any stray horizontal overflow (UI getting cut on phones). */
+  html,
+  body {
+    overflow-x: clip;
+  }
+}
+
+/* Mobile smoothness:
+   1. iOS Safari auto-zooms when an input's font-size is < 16px — annoying jump
+      on every Android/iOS phone. Force 16px on form controls for small screens
+      only; desktop keeps the tighter look.
+   2. -webkit-tap-highlight + touch scrolling feel native. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+input,
+select,
+textarea,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Horizontal tab bars / chip rows on phones: scroll without a visible bar. */
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Respect iOS safe areas (notch / home indicator) for fixed bottom bars. */
+@utility pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
 }
