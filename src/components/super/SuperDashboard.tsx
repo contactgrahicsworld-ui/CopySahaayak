@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, Store, BadgeCheck, Layers, ScrollText, Settings, LogOut, Loader2,
-  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users,
+  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2,
 } from 'lucide-react'
 
 export function SuperDashboard({ user }: { user: { name: string; email: string } }) {
@@ -170,6 +170,8 @@ function ShopsTab() {
   const [form, setForm] = useState({ name: '', ownerName: '', phone: '', adminEmail: '', adminPassword: '', planCode: 'FREE' })
   const [saving, setSaving] = useState(false)
   const [newCreds, setNewCreds] = useState<{ email: string; password?: string } | null>(null)
+  const [del, setDel] = useState<ShopRow | null>(null)
+  const [delConfirm, setDelConfirm] = useState('')
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/super/shops?q=${encodeURIComponent(q)}`, { cache: 'no-store' })
@@ -219,6 +221,28 @@ function ShopsTab() {
     load()
   }
 
+  async function deleteShop() {
+    if (!del) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/super/shops/${del.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: delConfirm.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast({ title: `Shop ${del.slug} deleted`, description: 'All tenant data and files were removed.' })
+      setDel(null)
+      setDelConfirm('')
+      load()
+    } catch (err) {
+      toast({ title: 'Delete failed', description: err instanceof Error ? err.message : '', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 items-center">
@@ -252,6 +276,7 @@ function ShopsTab() {
                     <Button size="sm" onClick={() => act(s.id, 'ACTIVATE')}><ShieldCheck className="h-3.5 w-3.5 mr-1" aria-hidden />Activate</Button>
                   )}
                   <Button size="sm" variant="outline" onClick={() => act(s.id, 'RESET_PASSWORD')}><KeyRound className="h-3.5 w-3.5 mr-1" aria-hidden />Reset pwd</Button>
+                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" aria-label={`Delete ${s.slug}`} onClick={() => { setDel(s); setDelConfirm('') }}><Trash2 className="h-3.5 w-3.5" aria-hidden /></Button>
                 </div>
               </CardContent>
             </Card>
@@ -294,6 +319,25 @@ function ShopsTab() {
           <DialogHeader><DialogTitle>Shop created — share these credentials</DialogTitle></DialogHeader>
           <p className="text-sm">Owner login: <strong>{newCreds?.email}</strong><br />Password: <strong>{newCreds?.password}</strong></p>
           <DialogFooter><Button onClick={() => setNewCreds(null)}>Done</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!del} onOpenChange={(v) => { if (!v) { setDel(null); setDelConfirm('') } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete shop {del?.slug}?</DialogTitle>
+            <DialogDescription>
+              Permanently removes the shop, its owner login, orders, documents, print jobs and uploaded files. This cannot be undone.
+              Type the shop slug <strong>{del?.slug}</strong> to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <Input value={delConfirm} onChange={(e) => setDelConfirm(e.target.value)} placeholder={del?.slug} aria-label="Confirm shop slug" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDel(null); setDelConfirm('') }}>Cancel</Button>
+            <Button variant="destructive" onClick={deleteShop} disabled={saving || delConfirm.trim() !== del?.slug}>
+              {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Delete forever
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

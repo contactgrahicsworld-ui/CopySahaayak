@@ -46,9 +46,14 @@ export function verifyFileSignature(fileId: string, exp: string | null, sig: str
 
 // ---- Request helpers ----
 export function getClientIp(req: Request): string {
+  // x-real-ip is set authoritatively by the Vercel edge (client-supplied values
+  // are overwritten) — prefer it over x-forwarded-for, whose leftmost value can
+  // be planted by the client to evade IP-based rate limiting.
+  const real = req.headers.get('x-real-ip')
+  if (real) return real.trim()
   const fwd = req.headers.get('x-forwarded-for')
   if (fwd) return fwd.split(',')[0].trim()
-  return req.headers.get('x-real-ip') || 'unknown'
+  return 'unknown'
 }
 
 // CSRF defense: state-changing requests must originate from our own origin.

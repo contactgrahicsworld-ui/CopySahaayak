@@ -106,5 +106,36 @@ export async function storageDelete(objectPath: string): Promise<void> {
   await db.storedObject.deleteMany({ where: { key: objectPath } }).catch(() => null)
 }
 
+/**
+ * Deletes every stored object under a prefix (e.g. `uploads/<shopId>/`) — used
+ * when a shop is offboarded so no orphaned files outlive the tenant.
+ */
+export async function storageDeletePrefix(prefix: string): Promise<number> {
+  if (STORAGE_DRIVER === 'supabase') {
+    try {
+      assertSupabaseStorage()
+      const listRes = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${DOCUMENTS_BUCKET}`, {
+        method: 'POST',
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefix, limit: 1000, sortBy: { column: 'name', order: 'asc' } }),
+      })
+      if (!listRes.ok) return 0
+      const objects = (await listRes.json()) as Array<{ name: string }>
+      const paths = objects.map((o) => `${prefix}${o.name}`)
+      if (paths.length === 0) return 0
+      const delRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${DOCUMENTS_BUCKET}`, {
+        method: 'DELETE',
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefixes: paths }),
+      })
+      return delRes.ok ? paths.length : 0
+    } catch {
+      return 0 // best-effort cleanup
+    }
+  }
+  const r = await db.storedObject.deleteMany({ where: { key: { startsWith: prefix } } }).catch(() => null)
+  return r ? r.count : 0
+}
+
 /** Stable content id helper (used for checksum validation paths). */
 export const newObjectKey = (): string => crypto.randomUUID()

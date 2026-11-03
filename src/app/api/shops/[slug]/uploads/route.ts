@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { getCustomerSession } from '@/lib/auth'
 import { saveUpload, processDocumentPages, fileUrl } from '@/lib/storage'
+import { storageDelete } from '@/lib/filestore'
 import { RATE_LIMITS } from '@/lib/rate-limit'
 import { getClientIp } from '@/lib/security'
 import { audit } from '@/lib/audit'
@@ -49,10 +50,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
           previewUrl: fileUrl(record.id),
         })
       } catch (err) {
-        // Validation failed — remove the stored record and file
+        // Validation failed — remove the stored record and the stored object
+        // (storageDelete works for both the Supabase Storage and database backends;
+        // never leave an orphaned object leaking storage).
         await db.document.delete({ where: { id: record.id } }).catch(() => {})
-        const fs = await import('fs')
-        fs.unlink(record.storedPath, () => {})
+        await storageDelete(record.storedPath)
         throw err
       }
     }

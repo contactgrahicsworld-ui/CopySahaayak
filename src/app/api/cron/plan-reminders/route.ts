@@ -12,6 +12,7 @@
 // may pass ?secret= (CRON_SECRET or APP_SECRET).
 import { db } from '@/lib/db'
 import { jsonOk, jsonError } from '@/lib/api'
+import { timingSafeEqualStr } from '@/lib/security'
 import { sendMail, mailTransport } from '@/lib/mailer'
 import { sendPlanExpiryWhatsApp, waConfigured } from '@/lib/whatsapp'
 
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const secret = process.env.CRON_SECRET || process.env.APP_SECRET || ''
   const provided = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || url.searchParams.get('secret') || ''
-  if (!secret || provided.length !== secret.length || provided !== secret) {
+  if (!secret || !timingSafeEqualStr(secret, provided)) {
     return jsonError(404, 'Not found')
   }
 
