@@ -827,6 +827,22 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
   const [payPlan, setPayPlan] = useState<{ code: string; name: string; pricePaise: number } | null>(null)
   const [utr, setUtr] = useState('')
   const [payerName, setPayerName] = useState('')
+  const [qr, setQr] = useState<{ url: string; dataUrl: string } | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/shops/${shop.slug}/qr`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.dataUrl) setQr({ url: d.url, dataUrl: d.dataUrl }) })
+      .catch(() => {})
+  }, [shop.slug])
+
+  function copyShopLink() {
+    const link = qr?.url || `${window.location.origin}/s/${shop.slug}`
+    navigator.clipboard?.writeText(link).then(
+      () => toast({ title: 'Ordering link copied', description: link }),
+      () => toast({ title: 'Copy failed', variant: 'destructive' })
+    )
+  }
 
   useEffect(() => {
     fetch('/api/admin/shop', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
@@ -888,6 +904,49 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
   return (
     <div className="space-y-4">
       <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2"><QrCode className="h-4 w-4" aria-hidden /> Your shop QR code</CardTitle>
+          <CardDescription>
+            Print this and keep it at your counter. Customers scan it with any phone camera to order — no app needed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col sm:flex-row gap-4 sm:items-center">
+          {qr ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={qr.dataUrl} alt={`QR code for ordering from ${shop.name}`} className="h-40 w-40 shrink-0 rounded-lg border bg-white p-1" />
+          ) : (
+            <div className="h-40 w-40 shrink-0 rounded-lg border bg-muted animate-pulse" aria-hidden />
+          )}
+          <div className="min-w-0 space-y-2">
+            <p className="text-sm break-all">
+              <span className="text-muted-foreground">Ordering link: </span>
+              <strong className="break-all">{qr?.url || `/s/${shop.slug}`}</strong>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" asChild>
+                <a href={`/qr/${shop.slug}`} target="_blank" rel="noopener noreferrer">
+                  <Printer className="h-4 w-4 mr-1.5" aria-hidden /> Print counter sign (A4)
+                </a>
+              </Button>
+              {qr && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={qr.dataUrl} download={`copysahaayak-qr-${shop.slug}.png`}>
+                    <FileText className="h-4 w-4 mr-1.5" aria-hidden /> Download PNG
+                  </a>
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={copyShopLink}>
+                <Check className="h-4 w-4 mr-1.5" aria-hidden /> Copy link
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Tip: laminate the printed sign — it works on every Android and iPhone camera.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">Shop profile</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={saveProfile} className="grid md:grid-cols-2 gap-3">
@@ -910,7 +969,7 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Subscription</CardTitle>
           <CardDescription>
-            Your customer ordering URL: <strong>/s/{shop.slug}</strong> — print this as your shop QR.
+            Your customer ordering link: <strong>/s/{shop.slug}</strong> — the printable QR code is at the top of this page.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

@@ -210,9 +210,17 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
     <main className="min-h-screen bg-muted/30 pb-28">
       <header className="bg-background border-b">
         <div className="container max-w-lg mx-auto px-4 py-4">
-          <h1 className="font-bold text-lg leading-tight">{shop.name}</h1>
-          {shop.address && <p className="text-xs text-muted-foreground">{shop.address}</p>}
-          {shop.phone && <p className="text-xs text-muted-foreground">{shop.phone}</p>}
+          <h1 className="font-extrabold text-xl sm:text-2xl leading-tight break-words">{shop.name}</h1>
+          {(shop.address || shop.phone) && (
+            <p className="text-xs text-muted-foreground mt-0.5">{[shop.address, shop.phone].filter(Boolean).join(' · ')}</p>
+          )}
+          <ol className="mt-2.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+            {['Upload files', 'Choose size & copies', 'Pay by UPI', 'Shop prints'].map((s, i) => (
+              <li key={s} className="rounded-full bg-muted px-2 py-0.5 whitespace-nowrap">
+                <span className="font-semibold text-foreground">{i + 1}</span> · {s}
+              </li>
+            ))}
+          </ol>
         </div>
       </header>
 
@@ -389,6 +397,8 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
             </CardContent>
           </Card>
         )}
+
+        <p className="text-center text-[11px] text-muted-foreground">Powered by CopySahaayak</p>
       </div>
 
       {items.length > 0 && (
@@ -456,6 +466,9 @@ function PayStage({
                 <img src={order.qrDataUrl} alt={`UPI QR code to pay ₹${(order.totalPaise / 100).toFixed(2)} to ${order.upi.payeeName}`} className="h-44 w-44 sm:h-56 sm:w-56" />
               </div>
             )}
+            <p className="text-xs text-muted-foreground">
+              Payment goes directly to <strong className="text-foreground">{shop.name}</strong> ({order.upi.payeeName})
+            </p>
             <p className="text-sm text-muted-foreground">
               Scan with any UPI app (GPay, PhonePe, Paytm, BHIM) — the amount is pre-filled.
               Paying from the same phone? Tap the button below to open your UPI app directly.
