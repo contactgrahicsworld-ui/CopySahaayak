@@ -8,6 +8,7 @@ import { storageDeletePrefix } from '@/lib/filestore'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 const patchSchema = z.object({
   action: z.enum(['ACTIVATE', 'SUSPEND', 'RESET_PASSWORD', 'REVOKE_ALL_DEVICES']),
@@ -85,31 +86,41 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const users = await db.user.findMany({ where: { shopId: id }, select: { id: true } })
     const userIds = users.map((u) => u.id)
 
-    const counts = await db.$transaction(async (tx) => {
-      const c: Record<string, number> = {}
-      c.sessions = (await tx.session.updateMany({ where: { userId: { in: userIds } }, data: { revokedAt: new Date() } })).count
-      c.printEvents = (await tx.printEvent.deleteMany({ where: { shopId: id } })).count
-      c.printJobs = (await tx.printJob.deleteMany({ where: { shopId: id } })).count
-      c.notifications = (await tx.notification.deleteMany({ where: { shopId: id } })).count
-      c.paymentVerifications = (
-        await tx.paymentVerification.deleteMany({ where: { paymentId: { in: (await tx.payment.findMany({ where: { shopId: id }, select: { id: true } })).map((p) => p.id) } } })
-      ).count
-      c.payments = (await tx.payment.deleteMany({ where: { shopId: id } })).count
-      c.orderItems = (await tx.orderItem.deleteMany({ where: { shopId: id } })).count
-      c.orders = (await tx.order.deleteMany({ where: { shopId: id } })).count
-      c.documents = (await tx.document.deleteMany({ where: { shopId: id } })).count
-      c.customerSessions = (await tx.customerSession.deleteMany({ where: { shopId: id } })).count
-      c.printers = (await tx.printer.deleteMany({ where: { shopId: id } })).count
-      c.devices = (await tx.device.deleteMany({ where: { shopId: id } })).count
-      c.routingRules = (await tx.routingRule.deleteMany({ where: { shopId: id } })).count
-      c.pricingRules = (await tx.pricingRule.deleteMany({ where: { shopId: id } })).count
-      c.shopMembers = (await tx.shopMember.deleteMany({ where: { shopId: id } })).count
-      c.subscriptionPayments = (await tx.subscriptionPayment.deleteMany({ where: { shopId: id } })).count
-      c.subscriptions = (await tx.subscription.deleteMany({ where: { shopId: id } })).count
-      c.users = (await tx.user.deleteMany({ where: { shopId: id } })).count
-      await tx.shop.delete({ where: { id } })
-      return c
-    })
+    // 19 sequential statements — on serverless + pooler each round-trip costs
+    // latency, so raise the interactive-transaction timeout well past the 5s default.
+    let counts: Record<string, number>
+    try {
+      counts = await db.$transaction(async (tx) => {
+        const c: Record<string, number> = {}
+        c.sessions = (await tx.session.updateMany({ where: { userId: { in: userIds } }, data: { revokedAt: new Date() } })).count
+        c.printEvents = (await tx.printEvent.deleteMany({ where: { shopId: id } })).count
+        c.printJobs = (await tx.printJob.deleteMany({ where: { shopId: id } })).count
+        c.notifications = (await tx.notification.deleteMany({ where: { shopId: id } })).count
+        c.paymentVerifications = (
+          await tx.paymentVerification.deleteMany({ where: { paymentId: { in: (await tx.payment.findMany({ where: { shopId: id }, select: { id: true } })).map((p) => p.id) } } })
+        ).count
+        c.payments = (await tx.payment.deleteMany({ where: { shopId: id } })).count
+        c.orderItems = (await tx.orderItem.deleteMany({ where: { shopId: id } })).count
+        c.orders = (await tx.order.deleteMany({ where: { shopId: id } })).count
+        c.documents = (await tx.document.deleteMany({ where: { shopId: id } })).count
+        c.customerSessions = (await tx.customerSession.deleteMany({ where: { shopId: id } })).count
+        c.printers = (await tx.printer.deleteMany({ where: { shopId: id } })).count
+        c.devices = (await tx.device.deleteMany({ where: { shopId: id } })).count
+        c.routingRules = (await tx.routingRule.deleteMany({ where: { shopId: id } })).count
+        c.pricingRules = (await tx.pricingRule.deleteMany({ where: { shopId: id } })).count
+        c.shopMembers = (await tx.shopMember.deleteMany({ where: { shopId: id } })).count
+        c.subscriptionPayments = (await tx.subscriptionPayment.deleteMany({ where: { shopId: id } })).count
+        c.subscriptions = (await tx.subscription.deleteMany({ where: { shopId: id } })).count
+        c.users = (await tx.user.deleteMany({ where: { shopId: id } })).count
+        await tx.shop.delete({ where: { id } })
+        return c
+      }, { maxWait: 15000, timeout: 60000 })
+    } catch (err) {
+      console.error('[super] shop delete failed:', err)
+      // The platform owner needs the real reason (which step failed) — safe:
+      // this route is super-admin-only and never exposes secret material.
+      return jsonError(500, `Delete failed: ${err instanceof Error ? err.message : 'unknown error'}`)
+    }
 
     // Storage is outside the DB transaction — purge after commit (best effort).
     const filesDeleted = await storageDeletePrefix(`uploads/${id}/`)
