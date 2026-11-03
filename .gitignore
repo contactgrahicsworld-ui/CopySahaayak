@@ -46,8 +46,9 @@ local-*
 *.log
 dev.log
 dev.out.log
-test
-prompt
+# scratch dirs at repo root only (bare 'test' would also ignore src/app/api/test)
+/test
+/prompt
 
 server.log
 # Skills directory

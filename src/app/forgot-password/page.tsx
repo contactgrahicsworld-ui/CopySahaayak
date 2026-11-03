@@ -18,6 +18,7 @@ export default function ForgotPasswordPage() {
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [inlineError, setInlineError] = useState<string | null>(null)
 
   async function requestOtp(e: React.FormEvent) {
     e.preventDefault()
@@ -30,10 +31,15 @@ export default function ForgotPasswordPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Could not send the email')
+      setInlineError(null)
       toast.success('6-digit code sent — check your email inbox')
       setStage('CODE')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not send the email')
+      const msg = err instanceof Error ? err.message : 'Could not send the email'
+      toast.error(msg)
+      // Persist the guidance (e.g. “email not configured — a Super Admin can
+      // reset any password from the dashboard”) — toasts vanish too fast.
+      setInlineError(msg)
     } finally {
       setLoading(false)
     }
@@ -76,6 +82,11 @@ export default function ForgotPasswordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {inlineError && stage === 'EMAIL' && (
+            <div role="alert" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {inlineError}
+            </div>
+          )}
           {stage === 'EMAIL' ? (
             <form onSubmit={requestOtp} className="space-y-4">
               <div className="space-y-1.5">
@@ -85,6 +96,9 @@ export default function ForgotPasswordPage() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Send code
               </Button>
+              <p className="text-xs text-center text-muted-foreground">
+                Email delivery not set up on this deployment? A Super Admin can reset any password from the Users tab in the platform dashboard.
+              </p>
             </form>
           ) : (
             <form onSubmit={submitReset} className="space-y-4">
