@@ -653,10 +653,26 @@ interface AuditRow {
 function AuditTab() {
   const [logs, setLogs] = useState<AuditRow[]>([])
   const [action, setAction] = useState('')
+  const [error, setError] = useState('')
+  const [retryTick, setRetryTick] = useState(0)
 
   useEffect(() => {
-    fetch(`/api/super/audit?action=${encodeURIComponent(action)}`, { cache: 'no-store' }).then((r) => r.json()).then((d) => d.logs && setLogs(d.logs))
-  }, [action])
+    let alive = true
+    setError('')
+    fetch(`/api/super/audit?action=${encodeURIComponent(action)}`, { cache: 'no-store' })
+      .then(async (r) => {
+        const d = await r.json().catch(() => null)
+        if (!alive) return
+        // A failed request must NEVER silently render as an empty log — show an error + retry.
+        if (!r.ok || !d?.logs) {
+          setError(r.status === 403 ? 'Session expired — sign in again.' : `Audit load failed (HTTP ${r.status}).`)
+          return
+        }
+        setLogs(d.logs)
+      })
+      .catch(() => { if (alive) setError('Audit load failed — network error. Try again.') })
+    return () => { alive = false }
+  }, [action, retryTick])
 
   return (
     <Card>
@@ -666,6 +682,12 @@ function AuditTab() {
       </CardHeader>
       <CardContent className="space-y-2">
         <Input placeholder="Filter e.g. PAYMENT, DEVICE, LOGIN" value={action} onChange={(e) => setAction(e.target.value)} className="w-full sm:max-w-sm" />
+        {error ? (
+          <div className="flex items-center gap-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm">
+            <span className="text-destructive">{error}</span>
+            <Button size="sm" variant="outline" onClick={() => setRetryTick((t) => t + 1)}>Retry</Button>
+          </div>
+        ) : (
         <div className="max-h-[60vh] overflow-auto rounded border">
           <table className="w-full min-w-[560px] text-xs">
             <thead className="bg-muted sticky top-0">
@@ -690,6 +712,7 @@ function AuditTab() {
             </tbody>
           </table>
         </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -699,10 +722,25 @@ function PlatformSettingsTab() {
   const { toast } = useToast()
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [retryTick, setRetryTick] = useState(0)
 
   useEffect(() => {
-    fetch('/api/super/settings', { cache: 'no-store' }).then((r) => r.json()).then((d) => d.settings && setForm(d.settings))
-  }, [])
+    let alive = true
+    setLoadError('')
+    fetch('/api/super/settings', { cache: 'no-store' })
+      .then(async (r) => {
+        const d = await r.json().catch(() => null)
+        if (!alive) return
+        if (!r.ok || !d?.settings) {
+          setLoadError(r.status === 403 ? 'Session expired — sign in again.' : `Settings load failed (HTTP ${r.status}).`)
+          return
+        }
+        setForm(d.settings)
+      })
+      .catch(() => { if (alive) setLoadError('Settings load failed — network error. Try again.') })
+    return () => { alive = false }
+  }, [retryTick])
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -733,6 +771,13 @@ function PlatformSettingsTab() {
     <Card className="max-w-xl">
       <CardHeader className="pb-2"><CardTitle className="text-base">Platform settings</CardTitle></CardHeader>
       <CardContent>
+        {loadError ? (
+          <div className="flex items-center gap-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm">
+            <span className="text-destructive">{loadError}</span>
+            <Button size="sm" variant="outline" onClick={() => setRetryTick((t) => t + 1)}>Retry</Button>
+          </div>
+        ) : (
+        <>
         {!form.super_admin_upi_vpa && (
           <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2 text-sm">
             Set your UPI ID below — until then shop owners cannot pay for plans.
@@ -748,6 +793,8 @@ function PlatformSettingsTab() {
           ))}
           <Button type="submit" disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Save settings</Button>
         </form>
+        </>
+        )}
       </CardContent>
     </Card>
   )
