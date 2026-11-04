@@ -57,7 +57,7 @@ jobs:
           $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
           if (-not (Test-Path $makensis)) { throw "makensis not found at $makensis" }
           Push-Location connector/installer
-          & $makensis -V2 PrintSahayak.nsi
+          & $makensis -V2 DesktopSahaayak.nsi
           $code = $LASTEXITCODE
           Pop-Location
           if ($code -ne 0) { exit $code }
@@ -65,17 +65,44 @@ jobs:
       - name: Collect artifacts
         run: |
           New-Item -ItemType Directory -Force -Path download/connector | Out-Null
-          Copy-Item connector/installer/PrintSahayak-Setup.exe download/connector/
-          Copy-Item connector/publish/PrintSahayakConnector.exe download/connector/PrintSahayak-portable.exe
+          Copy-Item connector/installer/DesktopSahaayak-Setup.exe download/connector/
+          Copy-Item connector/publish/PrintSahayakConnector.exe download/connector/DesktopSahaayak-portable.exe
           Get-FileHash download/connector/*.exe -Algorithm SHA256 | Format-Table -AutoSize
+
+      - name: Code-sign artifacts (runs only when signing secrets are configured)
+        if: ${{ secrets.SIGNING_CERT_PFX != '' }}
+        env:
+          SIGNING_CERT_PFX: ${{ secrets.SIGNING_CERT_PFX }}
+          SIGNING_CERT_PASS: ${{ secrets.SIGNING_CERT_PASS }}
+        shell: pwsh
+        run: |
+          $pfxPath = "$env:RUNNER_TEMP/signing-cert.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:SIGNING_CERT_PFX))
+          $pfx = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+            $pfxPath, $env:SIGNING_CERT_PASS,
+            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+          $signtool = (Get-ChildItem "C:/Program Files (x86)/Windows Kits/10/bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match "x64" } |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          if (-not $signtool) { throw "signtool.exe not found" }
+          foreach ($exe in @("download/connector/DesktopSahaayak-Setup.exe",
+                             "download/connector/DesktopSahaayak-portable.exe")) {
+            & $signtool sign /f $pfxPath /p $env:SIGNING_CERT_PASS /fd SHA256 `
+              /tr http://timestamp.digicert.com /td SHA256 `
+              /d "Desktop Sahaayak" /du "https://copysahaayak.vercel.app" $exe
+            if ($LASTEXITCODE -ne 0) { throw "signtool failed for $exe" }
+            & $signtool verify /pa $exe
+            if ($LASTEXITCODE -ne 0) { throw "signature verify failed for $exe" }
+          }
+          Remove-Item $pfxPath -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PrintSahayak-windows
+          name: DesktopSahaayak-windows
           path: |
-            download/connector/PrintSahayak-Setup.exe
-            download/connector/PrintSahayak-portable.exe
+            download/connector/DesktopSahaayak-Setup.exe
+            download/connector/DesktopSahaayak-portable.exe
           if-no-files-found: error
 
       - name: Create GitHub release (tags only)
@@ -84,14 +111,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $files = @(
-            "download/connector/PrintSahayak-Setup.exe",
-            "download/connector/PrintSahayak-portable.exe"
+            "download/connector/DesktopSahaayak-Setup.exe",
+            "download/connector/DesktopSahaayak-portable.exe"
           )
           $existing = gh release view $env:GITHUB_REF_NAME --json id 2>$null
           if ($existing) {
             gh release upload $env:GITHUB_REF_NAME $files --clobber
           } else {
             gh release create $env:GITHUB_REF_NAME $files `
-              --title "PrintSahayak Connector $($env:GITHUB_REF_NAME)" `
+              --title "Desktop Sahaayak $($env:GITHUB_REF_NAME)" `
               --generate-notes
           }

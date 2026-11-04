@@ -59,7 +59,7 @@ public sealed class TrayContext : ApplicationContext
         _tray = new NotifyIcon
         {
             Icon = LoadTrayIcon(),
-            Text = "PrintSahayak Connector",
+            Text = "Desktop Sahaayak",
             ContextMenuStrip = menu,
             Visible = true,
         };

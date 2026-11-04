@@ -25,6 +25,6 @@ for i in $(seq "$START" "$END"); do
     echo "--- last 25 lines ---"
     tail -25 "$LOGDIR/e2e-run-$i.log"
   fi
-  bun scripts/prod-e2e-cleanup.mjs > "$LOGDIR/cleanup-$i.log" 2>&1 || echo "cleanup warning run $i"
+  bash scripts/prod-e2e-cleanup-api.sh > "$LOGDIR/cleanup-$i.log" 2>&1 || echo "cleanup warning run $i"
 done
 echo "=== CHUNK $START-$END done $(date -u +%H:%M:%S) ==="

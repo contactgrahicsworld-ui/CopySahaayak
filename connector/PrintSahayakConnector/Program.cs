@@ -11,7 +11,7 @@ namespace PrintSahayakConnector;
 internal static class Program
 {
     /// <summary>Human readable product name used across dialogs, balloons and logs.</summary>
-    public const string AppTitle = "PrintSahayak Connector";
+    public const string AppTitle = "Desktop Sahaayak";
 
     /// <summary>Application version as reported to the SaaS (major.minor.patch).</summary>
     public static string AppVersion { get; } =

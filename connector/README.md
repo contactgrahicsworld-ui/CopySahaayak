@@ -1,9 +1,15 @@
-# PrintSahayak Connector (Windows)
+# Desktop Sahaayak (Windows)
 
 A small Windows tray application that connects the printers of a photocopy shop to the
-**PrintSahayak Automation SaaS**. Once paired and installed, it polls the shop server
-for print jobs, downloads the documents, prints them on the right printer (verified
-through the Windows print spooler) and reports the result back to the server.
+**Desktop Sahaayak print automation SaaS** (copysahaayak.vercel.app). Once paired and
+installed, it polls the shop server for print jobs, downloads the documents, prints
+them on the right printer (verified through the Windows print spooler) and reports
+the result back to the server.
+
+> v1.3.0 note: the product is now called **Desktop Sahaayak**. The inner executable
+> intentionally keeps the `PrintSahayakConnector.exe` file name so existing installs
+> upgrade in place without re-pairing (%APPDATA% state, autostart entry and
+> single-instance mutex stay stable).
 
 - **No .NET installation required** — the connector ships as a self-contained
   single-file executable.
@@ -17,23 +23,24 @@ through the Windows print spooler) and reports the result back to the server.
 
 ### Option A — Setup installer (recommended)
 
-1. Download `PrintSahayakConnector-Setup.exe` from the shop dashboard (or the GitHub
+1. Download `DesktopSahaayak-Setup.exe` from the shop dashboard (or the GitHub
    release page).
-2. Run the installer. Windows may show a **SmartScreen** warning for the unsigned
-   binary — see [SmartScreen](#5-windows-defender-smartscreen-blocked-the-install)
-   below.
+2. Run the installer. Depending on the certificate reputation Windows may show a
+   **SmartScreen** warning — see
+   [SmartScreen](#5-windows-defender-smartscreen-blocked-the-install) below.
 3. The installer
-   - copies `PrintSahayakConnector.exe` to `C:\Program Files\PrintSahayakConnector`,
-   - creates Start Menu and Desktop shortcuts,
-   - registers the `photocopyconnector://` protocol handler (so one-click pairing
-     links from the dashboard work),
+   - copies `PrintSahayakConnector.exe` to `C:\Program Files\PrintSahayak`,
+   - creates Start Menu and Desktop shortcuts (**Desktop Sahaayak**),
+   - registers the `printsahayak://` protocol handler (so one-click pairing
+     links from the dashboard work; the legacy `photocopyconnector://` scheme
+     is registered too and points at the same exe),
    - registers the app in *Add/Remove Programs* (with an uninstaller).
-4. On the finish page tick **Start PrintSahayak Connector now** — the pairing
+4. On the finish page tick **Start Desktop Sahaayak now** — the pairing
    dialog opens.
 
 ### Option B — Portable executable
 
-1. Download `PrintSahayakConnector-portable.exe`.
+1. Download `DesktopSahaayak-portable.exe`.
 2. Put it into any folder the user may write to (e.g. `C:\Tools\PrintSahayakConnector`).
 3. Double-click it. Without the installer the `photocopyconnector://` protocol is not
    registered — pairing links from the dashboard will not open the app; pair with a
@@ -130,15 +137,20 @@ Logs: tray menu → **Open Logs** (daily files in `%APPDATA%\PrintSahayakConnect
 
 ### Windows Defender SmartScreen blocked the install
 
-The installer/exe is **not code-signed**. SmartScreen shows
-*"Windows protected your PC"*.
+Reputation depends on the signing certificate (see `connector/CODE-SIGNING.md`):
+with an EV / Trusted-Signing certificate SmartScreen passes silently; with an OV
+cert reputation builds after enough clean downloads; the v1.3.0 test build is
+signed with a self-signed pipeline-validation certificate, so SmartScreen may
+still show *"Windows protected your PC"* until the production certificate is
+installed in CI.
 
 1. Click **More info** → **Run anyway** (per-machine decision).
 2. Admins can pre-approve the file: right-click the `.exe` → *Properties* → tick
-   *Unblock*, or `Unblock-File -Path .\PrintSahayakConnector-Setup.exe` in
+   *Unblock*, or `Unblock-File -Path .\DesktopSahaayak-Setup.exe` in
    PowerShell.
-3. Longer term: sign the binaries with an Authenticode certificate in the build
-   pipeline (see `.github/workflows/build-connector.yml`).
+3. Permanent fix: add the production certificate to CI
+   (`SIGNING_CERT_PFX` + `SIGNING_CERT_PASS` repo secrets) — artifacts are then
+   signed automatically on every tag build.
 
 ### Pairing code rejected / expired
 

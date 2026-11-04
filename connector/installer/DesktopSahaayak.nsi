@@ -1,20 +1,23 @@
-; PrintSahayak Connector — NSIS 3 installer script
+; Desktop Sahaayak — NSIS 3 installer script
 ; Self-contained: uses only built-in NSIS instructions + MUI2 (no plugin DLLs).
 ; Build (from this directory):
-;   makensis -V2 PrintSahayak.nsi
-; Produces: PrintSahayak-Setup.exe  (expects ..\publish\PrintSahayakConnector.exe)
+;   makensis -V2 DesktopSahaayak.nsi
+; Produces: DesktopSahaayak-Setup.exe  (expects ..\publish\PrintSahayakConnector.exe)
 ;
 ; Upgrade notes: this installer also removes the pre-rename "Photocopy Shop
 ; Connector" install (old dir + registry) and keeps the legacy
 ; photocopyconnector:// protocol working by pointing it at the new exe.
+; The inner exe keeps the PrintSahayakConnector.exe name on purpose: it keeps
+; the %APPDATA% state folder, autostart registry value and single-instance
+; mutex stable so existing installs upgrade in place without re-pairing.
 
 Unicode true
 ManifestDPIAware true
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 
-!define PRODUCT_NAME        "PrintSahayak Connector"
-!define PRODUCT_VERSION     "1.2.0"
+!define PRODUCT_NAME        "Desktop Sahaayak"
+!define PRODUCT_VERSION     "1.3.0"
 !define PRODUCT_PUBLISHER   "PrintSahayak Platforms"
 !define PRODUCT_EXE         "PrintSahayakConnector.exe"
 !define PRODUCT_UNINST_KEY  "Software\Microsoft\Windows\CurrentVersion\Uninstall\PrintSahayakConnector"
@@ -30,12 +33,12 @@ SetCompressor /SOLID lzma
 !include "MUI2.nsh"
 
 Name "${PRODUCT_NAME}"
-OutFile "PrintSahayak-Setup.exe"
+OutFile "DesktopSahaayak-Setup.exe"
 InstallDir "$PROGRAMFILES64\PrintSahayak"
 ShowInstDetails show
 ShowUnInstDetails nevershow
 
-VIProductVersion "1.2.0.0"
+VIProductVersion "1.3.0.0"
 VIAddVersionKey /LANG=1033 ProductName      "${PRODUCT_NAME}"
 VIAddVersionKey /LANG=1033 ProductVersion   "${PRODUCT_VERSION}"
 VIAddVersionKey /LANG=1033 FileVersion      "${PRODUCT_VERSION}"

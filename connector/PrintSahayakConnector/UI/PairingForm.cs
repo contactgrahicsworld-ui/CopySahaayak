@@ -55,7 +55,7 @@ public sealed class PairingForm : Form
 
         var intro = new Label
         {
-            Text = "Connect this computer to your PrintSahayak dashboard.\r\n" +
+            Text = "Connect this computer to your Desktop Sahaayak dashboard.\r\n" +
                    "Get a fresh pairing code from the dashboard: Devices → Pair a device.",
             Location = new Point(16, 14),
             Size = new Size(428, 40),
