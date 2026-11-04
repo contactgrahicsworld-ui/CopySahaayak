@@ -18,8 +18,11 @@ const RESEND_ENDPOINT = 'https://api.resend.com/emails'
 const MAIL_FROM = process.env.MAIL_FROM || 'CopySahaayak <onboarding@resend.dev>'
 
 export const mailTransport = ((): 'supabase' | 'resend' | 'mock' | 'none' => {
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return 'supabase'
+  // Resend wins when configured: verified-domain sender (no spam folder),
+  // higher rate limits and it also unlocks plan-reminder emails. Supabase
+  // built-in mailer stays as the automatic fallback (shared sender, ~2 mails/hour).
   if (process.env.RESEND_API_KEY) return 'resend'
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return 'supabase'
   if (process.env.MAIL_MOCK === '1') return 'mock'
   return 'none'
 })()
