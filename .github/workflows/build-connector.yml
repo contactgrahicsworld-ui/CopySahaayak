@@ -37,7 +37,7 @@ jobs:
 
       - name: Publish (self-contained single file)
         run: >
-          dotnet publish connector/PhotocopyShopConnector
+          dotnet publish connector/PrintSahayakConnector
           -c Release -r win-x64 --self-contained true
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
@@ -46,7 +46,7 @@ jobs:
 
       - name: Verify publish output
         run: |
-          $exe = "connector/publish/PhotocopyShopConnector.exe"
+          $exe = "connector/publish/PrintSahayakConnector.exe"
           if (-not (Test-Path $exe)) { throw "Publish output missing: $exe" }
           Get-Item $exe | Select-Object Name, Length
 
@@ -55,7 +55,7 @@ jobs:
           $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
           if (-not (Test-Path $makensis)) { throw "makensis not found at $makensis" }
           Push-Location connector/installer
-          & $makensis -V2 PhotocopyShopConnector.nsi
+          & $makensis -V2 PrintSahayak.nsi
           $code = $LASTEXITCODE
           Pop-Location
           if ($code -ne 0) { exit $code }
@@ -63,17 +63,17 @@ jobs:
       - name: Collect artifacts
         run: |
           New-Item -ItemType Directory -Force -Path download/connector | Out-Null
-          Copy-Item connector/installer/PhotocopyShopConnector-Setup.exe download/connector/
-          Copy-Item connector/publish/PhotocopyShopConnector.exe download/connector/PhotocopyShopConnector-portable.exe
+          Copy-Item connector/installer/PrintSahayak-Setup.exe download/connector/
+          Copy-Item connector/publish/PrintSahayakConnector.exe download/connector/PrintSahayak-portable.exe
           Get-FileHash download/connector/*.exe -Algorithm SHA256 | Format-Table -AutoSize
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PhotocopyShopConnector-windows
+          name: PrintSahayak-windows
           path: |
-            download/connector/PhotocopyShopConnector-Setup.exe
-            download/connector/PhotocopyShopConnector-portable.exe
+            download/connector/PrintSahayak-Setup.exe
+            download/connector/PrintSahayak-portable.exe
           if-no-files-found: error
 
       - name: Create GitHub release (tags only)
@@ -82,14 +82,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $files = @(
-            "download/connector/PhotocopyShopConnector-Setup.exe",
-            "download/connector/PhotocopyShopConnector-portable.exe"
+            "download/connector/PrintSahayak-Setup.exe",
+            "download/connector/PrintSahayak-portable.exe"
           )
           $existing = gh release view $env:GITHUB_REF_NAME --json id 2>$null
           if ($existing) {
             gh release upload $env:GITHUB_REF_NAME $files --clobber
           } else {
             gh release create $env:GITHUB_REF_NAME $files `
-              --title "Photocopy Shop Connector $($env:GITHUB_REF_NAME)" `
+              --title "PrintSahayak Connector $($env:GITHUB_REF_NAME)" `
               --generate-notes
           }

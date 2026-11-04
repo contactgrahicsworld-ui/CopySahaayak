@@ -1,7 +1,7 @@
-using PhotocopyShopConnector.Api;
-using PhotocopyShopConnector.Printing;
+using PrintSahayakConnector.Api;
+using PrintSahayakConnector.Printing;
 
-namespace PhotocopyShopConnector.Core;
+namespace PrintSahayakConnector.Core;
 
 /// <summary>High level worker state surfaced in the tray and the status window.</summary>
 public enum WorkerState

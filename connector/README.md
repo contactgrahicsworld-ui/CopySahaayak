@@ -1,7 +1,7 @@
-# Photocopy Shop Connector (Windows)
+# PrintSahayak Connector (Windows)
 
 A small Windows tray application that connects the printers of a photocopy shop to the
-**Photocopy Shop Automation SaaS**. Once paired and installed, it polls the shop server
+**PrintSahayak Automation SaaS**. Once paired and installed, it polls the shop server
 for print jobs, downloads the documents, prints them on the right printer (verified
 through the Windows print spooler) and reports the result back to the server.
 
@@ -9,7 +9,7 @@ through the Windows print spooler) and reports the result back to the server.
   single-file executable.
 - Runs entirely in the system tray; configuration happens through small dialogs.
 - Stores its state (pairing, printer mapping, dedupe list, logs) under
-  `%APPDATA%\PhotocopyShopConnector`.
+  `%APPDATA%\PrintSahayakConnector`.
 
 ---
 
@@ -17,24 +17,24 @@ through the Windows print spooler) and reports the result back to the server.
 
 ### Option A — Setup installer (recommended)
 
-1. Download `PhotocopyShopConnector-Setup.exe` from the shop dashboard (or the GitHub
+1. Download `PrintSahayakConnector-Setup.exe` from the shop dashboard (or the GitHub
    release page).
 2. Run the installer. Windows may show a **SmartScreen** warning for the unsigned
    binary — see [SmartScreen](#5-windows-defender-smartscreen-blocked-the-install)
    below.
 3. The installer
-   - copies `PhotocopyShopConnector.exe` to `C:\Program Files\PhotocopyShopConnector`,
+   - copies `PrintSahayakConnector.exe` to `C:\Program Files\PrintSahayakConnector`,
    - creates Start Menu and Desktop shortcuts,
    - registers the `photocopyconnector://` protocol handler (so one-click pairing
      links from the dashboard work),
    - registers the app in *Add/Remove Programs* (with an uninstaller).
-4. On the finish page tick **Start Photocopy Shop Connector now** — the pairing
+4. On the finish page tick **Start PrintSahayak Connector now** — the pairing
    dialog opens.
 
 ### Option B — Portable executable
 
-1. Download `PhotocopyShopConnector-portable.exe`.
-2. Put it into any folder the user may write to (e.g. `C:\Tools\PhotocopyShopConnector`).
+1. Download `PrintSahayakConnector-portable.exe`.
+2. Put it into any folder the user may write to (e.g. `C:\Tools\PrintSahayakConnector`).
 3. Double-click it. Without the installer the `photocopyconnector://` protocol is not
    registered — pairing links from the dashboard will not open the app; pair with a
    manual code instead.
@@ -86,7 +86,7 @@ Click **Save** — the mapping is stored locally and pushed to the server immedi
   PRINTED/COMPLETE state). A job that is printed twice by accident is suppressed
   locally (30-day dedupe list).
 
-Logs: tray menu → **Open Logs** (daily files in `%APPDATA%\PhotocopyShopConnector\Logs`).
+Logs: tray menu → **Open Logs** (daily files in `%APPDATA%\PrintSahayakConnector\Logs`).
 
 ## 4. Troubleshooting
 
@@ -135,7 +135,7 @@ The installer/exe is **not code-signed**. SmartScreen shows
 
 1. Click **More info** → **Run anyway** (per-machine decision).
 2. Admins can pre-approve the file: right-click the `.exe` → *Properties* → tick
-   *Unblock*, or `Unblock-File -Path .\PhotocopyShopConnector-Setup.exe` in
+   *Unblock*, or `Unblock-File -Path .\PrintSahayakConnector-Setup.exe` in
    PowerShell.
 3. Longer term: sign the binaries with an Authenticode certificate in the build
    pipeline (see `.github/workflows/build-connector.yml`).
@@ -150,10 +150,10 @@ The installer/exe is **not code-signed**. SmartScreen shows
 
 ## 5. Data & privacy
 
-- `%APPDATA%\PhotocopyShopConnector\state.db` — SQLite: server URL, device token,
+- `%APPDATA%\PrintSahayakConnector\state.db` — SQLite: server URL, device token,
   printer mapping, dedupe list. **Keep it private** — anyone holding the device token
   can print to this machine.
-- `%APPDATA%\PhotocopyShopConnector\Logs\` — rolling 30-day log.
+- `%APPDATA%\PrintSahayakConnector\Logs\` — rolling 30-day log.
 - Uninstalling does **not** delete this data (so reinstalling does not force
   re-pairing). Delete the folder manually to fully reset the device.
 
@@ -161,8 +161,8 @@ The installer/exe is **not code-signed**. SmartScreen shows
 
 ```bash
 scripts/build-connector.sh
-# → connector/publish/PhotocopyShopConnector.exe          (portable, self-contained)
-# → connector/installer/PhotocopyShopConnector-Setup.exe  (NSIS installer)
+# → connector/publish/PrintSahayakConnector.exe          (portable, self-contained)
+# → connector/installer/PrintSahayakConnector-Setup.exe  (NSIS installer)
 # → download/connector/…  (copies + sha256)
 ```
 

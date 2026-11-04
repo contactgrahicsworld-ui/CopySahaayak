@@ -1,6 +1,6 @@
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Core;
 
-namespace PhotocopyShopConnector.UI;
+namespace PrintSahayakConnector.UI;
 
 /// <summary>
 /// Non-modal status window shown from the tray menu / double click. It displays the

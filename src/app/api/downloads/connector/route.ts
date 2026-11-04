@@ -8,8 +8,8 @@ import { RATE_LIMITS } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
-const INSTALLER_NAME = 'PhotocopyShopConnector-Setup.exe'
-const GITHUB_RAW = process.env.CONNECTOR_DOWNLOAD_URL || 'https://github.com/contactgrahicsworld-ui/CopySahaayak/releases/download/connector-v1.0.2/PhotocopyShopConnector-Setup.exe'
+const INSTALLER_NAME = 'PrintSahayak-Setup.exe'
+const GITHUB_RAW = process.env.CONNECTOR_DOWNLOAD_URL || 'https://github.com/contactgrahicsworld-ui/CopySahaayak/releases/download/connector-v1.2.0/PrintSahayak-Setup.exe'
 
 function findInstaller(): string | null {
   const candidates = [

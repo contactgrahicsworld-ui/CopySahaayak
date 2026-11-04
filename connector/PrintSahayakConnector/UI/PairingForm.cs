@@ -1,8 +1,8 @@
 using System.Net;
-using PhotocopyShopConnector.Api;
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Api;
+using PrintSahayakConnector.Core;
 
-namespace PhotocopyShopConnector.UI;
+namespace PrintSahayakConnector.UI;
 
 /// <summary>
 /// First-run / re-pairing dialog: server URL, 6-character pairing code, machine
@@ -55,7 +55,7 @@ public sealed class PairingForm : Form
 
         var intro = new Label
         {
-            Text = "Connect this computer to your Photocopy Shop dashboard.\r\n" +
+            Text = "Connect this computer to your PrintSahayak dashboard.\r\n" +
                    "Get a fresh pairing code from the dashboard: Devices → Pair a device.",
             Location = new Point(16, 14),
             Size = new Size(428, 40),

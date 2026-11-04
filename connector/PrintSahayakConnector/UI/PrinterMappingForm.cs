@@ -1,7 +1,7 @@
 using System.Data;
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Core;
 
-namespace PhotocopyShopConnector.UI;
+namespace PrintSahayakConnector.UI;
 
 /// <summary>
 /// Lets the shop owner decide which of the locally installed Windows printers may

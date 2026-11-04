@@ -7,7 +7,7 @@ import { Download, MonitorCheck, TriangleAlert, Trash2, BookOpen } from 'lucide-
 export const metadata = { title: 'Windows Connector — CopySahaayak' }
 
 const steps = [
-  'Download PhotocopyShopConnector-Setup.exe below.',
+  'Download PrintSahayak-Setup.exe below.',
   'Double-click the installer. Windows may show a SmartScreen warning because the installer is not code-signed — click "More info" → "Run anyway".',
   'The connector starts automatically after install and lives in your system tray.',
   'In the Shop Admin dashboard open Printers & Devices → "Pair connector" and copy the 6-character code (valid 15 minutes).',
@@ -33,7 +33,7 @@ export default function DownloadPage() {
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
           <Button asChild size="lg" className="flex-1">
             <a href="/api/downloads/connector" download>
-              <Download className="h-4 w-4 mr-2" aria-hidden /> PhotocopyShopConnector-Setup.exe
+              <Download className="h-4 w-4 mr-2" aria-hidden /> PrintSahayak-Setup.exe
             </a>
           </Button>
         </div>
@@ -92,7 +92,7 @@ export default function DownloadPage() {
             <CardTitle className="text-base flex items-center gap-2"><Trash2 className="h-4 w-4" aria-hidden /> Uninstall</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Settings → Apps → Installed apps → <strong>Photocopy Shop Connector</strong> → Uninstall. This removes the
+            Settings → Apps → Installed apps → <strong>PrintSahayak Connector</strong> → Uninstall. This removes the
             program, shortcuts, autostart entry and the pairing protocol handler.
           </CardContent>
         </Card>

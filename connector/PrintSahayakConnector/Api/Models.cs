@@ -1,4 +1,4 @@
-namespace PhotocopyShopConnector.Api;
+namespace PrintSahayakConnector.Api;
 
 /// <summary>Request body for <c>POST /api/device/pair</c>.</summary>
 public sealed record PairRequest(string PairingCode, string MachineName, string AppVersion);

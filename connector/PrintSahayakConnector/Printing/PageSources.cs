@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using PDFtoImage;
 using SkiaSharp;
 
-namespace PhotocopyShopConnector.Printing;
+namespace PrintSahayakConnector.Printing;
 
 /// <summary>
 /// Supplies printable page bitmaps one by one so large PDFs never have to be held

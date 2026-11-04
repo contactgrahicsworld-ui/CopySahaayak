@@ -68,11 +68,14 @@ nohup.out
 # connector build output (large binaries — deliver via releases/app download)
 /connector/publish/
 *.exe
-/connector/PhotocopyShopConnector/bin/
-/connector/PhotocopyShopConnector/obj/
+/connector/PrintSahayakConnector/bin/
+/connector/PrintSahayakConnector/obj/
 /connector/installer/PhotocopyShopConnector-Setup.exe
 tool-results/
 
 # local-only credential artifacts (never commit)
 .bootstrap-super-pw
 *.pw.txt
+.dbpass
+download/
+private-data/

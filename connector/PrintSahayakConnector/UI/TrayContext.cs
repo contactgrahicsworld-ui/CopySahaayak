@@ -1,7 +1,7 @@
-using PhotocopyShopConnector.Api;
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Api;
+using PrintSahayakConnector.Core;
 
-namespace PhotocopyShopConnector.UI;
+namespace PrintSahayakConnector.UI;
 
 /// <summary>
 /// The whole application lives in this <see cref="ApplicationContext"/>: tray icon
@@ -59,7 +59,7 @@ public sealed class TrayContext : ApplicationContext
         _tray = new NotifyIcon
         {
             Icon = LoadTrayIcon(),
-            Text = "Photocopy Shop Connector",
+            Text = "PrintSahayak Connector",
             ContextMenuStrip = menu,
             Visible = true,
         };

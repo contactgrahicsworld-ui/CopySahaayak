@@ -1,7 +1,7 @@
 using System.IO.MemoryMappedFiles;
 using System.Text;
 
-namespace PhotocopyShopConnector.Core;
+namespace PrintSahayakConnector.Core;
 
 /// <summary>
 /// Cross-process bridge so a second app launch (e.g. a <c>photocopyconnector://</c>
@@ -10,8 +10,8 @@ namespace PhotocopyShopConnector.Core;
 /// </summary>
 public static class PairingHint
 {
-    private const string MmfName = "PhotocopyShopConnector.PairingHint";
-    private const string EventName = "PhotocopyShopConnector.PairingHintEvent";
+    private const string MmfName = "PrintSahayakConnector.PairingHint";
+    private const string EventName = "PrintSahayakConnector.PairingHintEvent";
     private const int Capacity = 4096;
 
     /// <summary>Called by the short-lived second instance to publish a raw deep link.</summary>

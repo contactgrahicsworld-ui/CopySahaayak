@@ -1,7 +1,7 @@
 using System.Drawing.Printing;
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Core;
 
-namespace PhotocopyShopConnector.Printing;
+namespace PrintSahayakConnector.Printing;
 
 /// <summary>
 /// Resolves canonical paper size names (A4, A3, A5, LETTER, LEGAL, …) to a

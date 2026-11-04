@@ -1,4 +1,4 @@
-namespace PhotocopyShopConnector.Core;
+namespace PrintSahayakConnector.Core;
 
 /// <summary>
 /// Guarantees that only one instance of the connector runs per Windows session.
@@ -7,7 +7,7 @@ namespace PhotocopyShopConnector.Core;
 /// </summary>
 public sealed class SingleInstanceGuard : IDisposable
 {
-    private const string MutexName = @"Local\PhotocopyShopConnector.SingleInstance";
+    private const string MutexName = @"Local\PrintSahayakConnector.SingleInstance";
 
     private readonly Mutex _mutex;
 

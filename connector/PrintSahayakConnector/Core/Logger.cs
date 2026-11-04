@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace PhotocopyShopConnector.Core;
+namespace PrintSahayakConnector.Core;
 
 /// <summary>Severity levels for log entries.</summary>
 public enum LogLevel
@@ -13,7 +13,7 @@ public enum LogLevel
 
 /// <summary>
 /// Minimal rolling-file logger: one file per day (<c>log-yyyyMMdd.txt</c>) inside
-/// <c>%APPDATA%\PhotocopyShopConnector\Logs</c>. Logging must never crash the app,
+/// <c>%APPDATA%\PrintSahayakConnector\Logs</c>. Logging must never crash the app,
 /// so every write is guarded and failures are swallowed.
 /// </summary>
 public static class Logger
@@ -23,9 +23,31 @@ public static class Logger
     private static readonly object Gate = new();
     private static string _logDir = string.Empty;
 
-    /// <summary>Root folder for all application state (<c>%APPDATA%\PhotocopyShopConnector</c>).</summary>
+    private const string LegacyAppDataFolder = "PhotocopyShopConnector";
+
+    /// <summary>Root folder for all application state (<c>%APPDATA%\PrintSahayakConnector</c>).</summary>
     public static string AppDataRoot =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PhotocopyShopConnector");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PrintSahayakConnector");
+
+    /// <summary>
+    /// One-time migration from the pre-rename <c>%APPDATA%\PhotocopyShopConnector</c>
+    /// folder so upgraded installs keep their pairing state without re-pairing.
+    /// </summary>
+    private static void MigrateLegacyAppData()
+    {
+        try
+        {
+            var root = AppDataRoot;
+            if (Directory.Exists(root)) return; // already migrated / fresh install
+            var legacy = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), LegacyAppDataFolder);
+            if (!Directory.Exists(legacy)) return;
+            Directory.Move(legacy, root);
+        }
+        catch
+        {
+            // Swallow — worst case the shop re-pairs once.
+        }
+    }
 
     /// <summary>Folder that contains the rolling log files.</summary>
     public static string LogDirectory => _logDir;
@@ -38,6 +60,7 @@ public static class Logger
     {
         try
         {
+            MigrateLegacyAppData();
             _logDir = Path.Combine(AppDataRoot, "Logs");
             Directory.CreateDirectory(_logDir);
             PruneOldLogs();

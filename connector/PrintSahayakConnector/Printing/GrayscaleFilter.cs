@@ -1,6 +1,6 @@
 using System.Drawing.Imaging;
 
-namespace PhotocopyShopConnector.Printing;
+namespace PrintSahayakConnector.Printing;
 
 /// <summary>
 /// Converts page bitmaps to grayscale via a GDI+ <see cref="ColorMatrix"/>

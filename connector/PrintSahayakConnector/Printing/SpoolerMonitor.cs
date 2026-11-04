@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Core;
 
-namespace PhotocopyShopConnector.Printing;
+namespace PrintSahayakConnector.Printing;
 
 /// <summary>A snapshot of one job in the Windows print spooler queue.</summary>
 /// <param name="JobId">Spooler job id.</param>

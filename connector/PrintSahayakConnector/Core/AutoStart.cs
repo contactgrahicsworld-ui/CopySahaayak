@@ -1,12 +1,12 @@
 using Microsoft.Win32;
 
-namespace PhotocopyShopConnector.Core;
+namespace PrintSahayakConnector.Core;
 
 /// <summary>Manages the HKCU Run key that starts the connector with Windows.</summary>
 public static class AutoStart
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "PhotocopyShopConnector";
+    private const string ValueName = "PrintSahayakConnector";
 
     /// <summary>Whether the autostart Run value currently exists.</summary>
     public static bool IsEnabled()

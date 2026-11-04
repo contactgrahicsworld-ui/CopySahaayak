@@ -6,15 +6,15 @@
     <UseWindowsForms>true</UseWindowsForms>
     <!-- Allows building/publishing a windows-targeting project from Linux CI. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <AssemblyName>PhotocopyShopConnector</AssemblyName>
-    <RootNamespace>PhotocopyShopConnector</RootNamespace>
+    <AssemblyName>PrintSahayakConnector</AssemblyName>
+    <RootNamespace>PrintSahayakConnector</RootNamespace>
     <Version>1.1.0</Version>
     <AssemblyVersion>1.1.0.0</AssemblyVersion>
     <FileVersion>1.1.0.0</FileVersion>
     <InformationalVersion>1.1.0</InformationalVersion>
-    <Company>Photocopy Shop</Company>
-    <Product>Photocopy Shop Connector</Product>
-    <Description>Tray application that connects shop printers to the Photocopy Shop Automation SaaS.</Description>
+    <Company>PrintSahayak Platforms</Company>
+    <Product>PrintSahayak Connector</Product>
+    <Description>Tray application that connects shop printers to the PrintSahayak Automation SaaS.</Description>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>

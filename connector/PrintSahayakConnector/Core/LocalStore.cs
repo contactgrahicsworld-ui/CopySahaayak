@@ -1,6 +1,6 @@
 using Microsoft.Data.Sqlite;
 
-namespace PhotocopyShopConnector.Core;
+namespace PrintSahayakConnector.Core;
 
 /// <summary>A single printer mapping configured by the shop owner.</summary>
 /// <param name="WindowsName">Exact Windows printer name (as in <c>PrinterSettings.InstalledPrinters</c>).</param>

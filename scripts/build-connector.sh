@@ -2,7 +2,7 @@
 #
 # Builds the Windows connector end-to-end on Linux:
 #   1. dotnet publish  → single-file self-contained win-x64 exe
-#   2. makensis        → PhotocopyShopConnector-Setup.exe
+#   2. makensis        → PrintSahayak-Setup.exe
 #   3. artifacts       → /home/z/my-project/download/connector/
 #
 set -euo pipefail
@@ -11,7 +11,7 @@ export PATH="$HOME/.dotnet:$HOME/.local/nsis/usr/bin:$PATH"
 export NSISDIR="$HOME/.local/nsis/usr/share/nsis"
 
 ROOT="/home/z/my-project"
-PROJECT_DIR="$ROOT/connector/PhotocopyShopConnector"
+PROJECT_DIR="$ROOT/connector/PrintSahayakConnector"
 PUBLISH_DIR="$ROOT/connector/publish"
 INSTALLER_DIR="$ROOT/connector/installer"
 DOWNLOAD_DIR="$ROOT/download/connector"
@@ -28,7 +28,7 @@ dotnet publish -c Release -r win-x64 --self-contained true \
   -p:PublishTrimmed=false \
   -o ../publish
 
-EXE="$PUBLISH_DIR/PhotocopyShopConnector.exe"
+EXE="$PUBLISH_DIR/PrintSahayakConnector.exe"
 if [[ ! -f "$EXE" ]]; then
   echo "ERROR: publish output not found at $EXE" >&2
   exit 1
@@ -43,9 +43,9 @@ fi
 
 echo "==> NSIS installer"
 cd "$INSTALLER_DIR"
-makensis -V2 PhotocopyShopConnector.nsi
+makensis -V2 PrintSahayak.nsi
 
-SETUP="$INSTALLER_DIR/PhotocopyShopConnector-Setup.exe"
+SETUP="$INSTALLER_DIR/PrintSahayak-Setup.exe"
 if [[ ! -f "$SETUP" ]]; then
   echo "ERROR: installer output not found at $SETUP" >&2
   exit 1
@@ -53,12 +53,12 @@ fi
 
 echo "==> Copying artifacts to $DOWNLOAD_DIR"
 mkdir -p "$DOWNLOAD_DIR"
-cp -f "$SETUP" "$DOWNLOAD_DIR/PhotocopyShopConnector-Setup.exe"
-cp -f "$EXE"   "$DOWNLOAD_DIR/PhotocopyShopConnector-portable.exe"
+cp -f "$SETUP" "$DOWNLOAD_DIR/PrintSahayak-Setup.exe"
+cp -f "$EXE"   "$DOWNLOAD_DIR/PrintSahayak-portable.exe"
 
 echo "==> Artifacts"
-for f in "$DOWNLOAD_DIR/PhotocopyShopConnector-Setup.exe" \
-         "$DOWNLOAD_DIR/PhotocopyShopConnector-portable.exe"; do
+for f in "$DOWNLOAD_DIR/PrintSahayak-Setup.exe" \
+         "$DOWNLOAD_DIR/PrintSahayak-portable.exe"; do
   size=$(stat -c '%s' "$f")
   hash=$(sha256sum "$f" | awk '{print $1}')
   mib=$(awk "BEGIN{printf \"%.1f\", $size/1048576}")

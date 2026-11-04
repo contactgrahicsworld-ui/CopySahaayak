@@ -1,22 +1,27 @@
-namespace PhotocopyShopConnector.Core;
+namespace PrintSahayakConnector.Core;
 
-/// <summary>A parsed <c>photocopyconnector://pair</c> deep link.</summary>
+/// <summary>A parsed <c>printsahayak://pair</c> deep link.</summary>
 public sealed record PairingLink(string ServerUrl, string PairingCode);
 
 /// <summary>
-/// Parses <c>photocopyconnector://pair?server=&lt;urlencoded&gt;&amp;code=&lt;6 chars&gt;</c>
-/// deep links. The installer registers the protocol handler; the Shop Admin dashboard
-/// can hand out such links for one-click pairing.
+/// Parses <c>printsahayak://pair?server=&lt;urlencoded&gt;&amp;code=&lt;6 chars&gt;</c>
+/// deep links (legacy <c>photocopyconnector://</c> links are still accepted so
+/// dashboards opened before an upgrade keep working). The installer registers the
+/// protocol handler; the Shop Admin dashboard can hand out such links for one-click pairing.
 /// </summary>
 public static class DeepLinkParser
 {
     /// <summary>URL protocol scheme registered by the NSIS installer.</summary>
-    public const string Scheme = "photocopyconnector";
+    public const string Scheme = "printsahayak";
+
+    /// <summary>Pre-rename scheme still registered by old installs — accepted for compatibility.</summary>
+    public const string LegacyScheme = "photocopyconnector";
 
     /// <summary>Returns the first argument that looks like one of our deep links, or null.</summary>
     public static string? FindLink(string[] args) =>
         args.FirstOrDefault(a => !string.IsNullOrEmpty(a) &&
-                                 a.StartsWith(Scheme + "://", StringComparison.OrdinalIgnoreCase));
+                                 (a.StartsWith(Scheme + "://", StringComparison.OrdinalIgnoreCase) ||
+                                  a.StartsWith(LegacyScheme + "://", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>Parses a deep link into server URL + pairing code; null when malformed.</summary>
     public static PairingLink? Parse(string? raw)

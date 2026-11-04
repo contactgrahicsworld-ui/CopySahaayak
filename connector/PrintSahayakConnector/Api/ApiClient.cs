@@ -2,9 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Core;
 
-namespace PhotocopyShopConnector.Api;
+namespace PrintSahayakConnector.Api;
 
 /// <summary>Thrown when the SaaS answers with a non-success status code.</summary>
 public sealed class ApiException : Exception
@@ -22,7 +22,7 @@ public sealed class ApiException : Exception
 }
 
 /// <summary>
-/// Thin typed HTTP client for the device API of the Photocopy Shop SaaS.
+/// Thin typed HTTP client for the device API of the PrintSahayak SaaS.
 /// Enforces HTTPS (plain http is only accepted for localhost development) and
 /// attaches the device token to authenticated endpoints.
 /// </summary>
@@ -42,7 +42,7 @@ public sealed class ApiClient : IDisposable
     {
         ServerUrl = NormalizeServerUrl(serverUrl);
         _http = new HttpClient { BaseAddress = new Uri(ServerUrl + "/"), Timeout = TimeSpan.FromMinutes(2) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd($"PhotocopyShopConnector/{Program.AppVersion}");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd($"PrintSahayakConnector/{Program.AppVersion}");
         ApplyAuthHeader();
     }
 
@@ -158,7 +158,7 @@ public sealed class ApiClient : IDisposable
                 $"Document is too large ({response.Content.Headers.ContentLength.Value / 1024 / 1024} MB).");
         }
 
-        var directory = Path.Combine(Path.GetTempPath(), "PhotocopyShopConnector");
+        var directory = Path.Combine(Path.GetTempPath(), "PrintSahayakConnector");
         Directory.CreateDirectory(directory);
         var safeJob = SanitizeFileName(string.IsNullOrEmpty(job.Id) ? "job" : job.Id);
         var safeName = SanitizeFileName(string.IsNullOrEmpty(job.Document.FileName) ? "document" : job.Document.FileName);

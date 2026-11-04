@@ -1,8 +1,8 @@
 using System.Reflection;
-using PhotocopyShopConnector.Core;
-using PhotocopyShopConnector.UI;
+using PrintSahayakConnector.Core;
+using PrintSahayakConnector.UI;
 
-namespace PhotocopyShopConnector;
+namespace PrintSahayakConnector;
 
 /// <summary>
 /// Application entry point. Enforces single instance, initialises the logger and
@@ -11,7 +11,7 @@ namespace PhotocopyShopConnector;
 internal static class Program
 {
     /// <summary>Human readable product name used across dialogs, balloons and logs.</summary>
-    public const string AppTitle = "Photocopy Shop Connector";
+    public const string AppTitle = "PrintSahayak Connector";
 
     /// <summary>Application version as reported to the SaaS (major.minor.patch).</summary>
     public static string AppVersion { get; } =

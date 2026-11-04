@@ -1,8 +1,8 @@
-using PhotocopyShopConnector.Api;
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Api;
+using PrintSahayakConnector.Core;
 using System.Drawing.Printing;
 
-namespace PhotocopyShopConnector.Printing;
+namespace PrintSahayakConnector.Printing;
 
 /// <summary>A resolved print target and why it was chosen.</summary>
 /// <param name="Name">Exact Windows printer name to hand to <see cref="PrinterSettings"/>.</param>

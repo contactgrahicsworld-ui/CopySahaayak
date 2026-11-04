@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const origin = new URL(req.url).origin
     return jsonOk({
       device: { id: device.id, name: device.name, pairingCode: code, expiresAt: device.pairingExpiresAt, status: device.status },
-      deepLink: `photocopyconnector://pair?server=${encodeURIComponent(origin)}&code=${code}`,
+      deepLink: `printsahayak://pair?server=${encodeURIComponent(origin)}&code=${code}`,
     })
   })
 }

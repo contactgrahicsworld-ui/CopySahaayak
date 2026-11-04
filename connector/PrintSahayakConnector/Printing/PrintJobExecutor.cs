@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Drawing.Printing;
-using PhotocopyShopConnector.Core;
+using PrintSahayakConnector.Core;
 
-namespace PhotocopyShopConnector.Printing;
+namespace PrintSahayakConnector.Printing;
 
 /// <summary>Everything needed to print one claimed job.</summary>
 /// <param name="FilePath">Full path of the downloaded document.</param>
