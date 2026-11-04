@@ -126,6 +126,12 @@ export const superResetPasswordSchema = z.object({
   newPassword: newPasswordSchema,
 })
 
+// Platform admin handover: the active super admin deactivates THEMSELVES with
+// password confirmation (re-opens one-time /setup for a fresh platform admin).
+export const superHandoverSchema = z.object({
+  password: z.string().min(1).max(200),
+})
+
 export const setupSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email().max(120),

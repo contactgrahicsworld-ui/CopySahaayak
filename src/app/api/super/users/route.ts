@@ -5,8 +5,8 @@
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
-import { superResetPasswordSchema } from '@/lib/validation'
-import { bcryptHash, getClientIp } from '@/lib/security'
+import { superResetPasswordSchema, superHandoverSchema } from '@/lib/validation'
+import { bcryptHash, bcryptCompare, getClientIp } from '@/lib/security'
 import { audit } from '@/lib/audit'
 
 export const dynamic = 'force-dynamic'
@@ -64,5 +64,53 @@ export async function POST(req: Request) {
       ip: getClientIp(req),
     })
     return jsonOk({ ok: true })
+  })
+}
+
+// Platform admin handover — the ONLY supported way a super admin account is
+// removed. The active super admin deactivates THEMSELVES (password-confirmed,
+// fully audited, every session revoked). This re-opens the one-time /setup
+// endpoint so a completely fresh platform admin can be created with new
+// credentials — no email/OTP dependency anywhere in the flow.
+// Guards:
+//  - requireSuper: an authenticated, active super admin session is mandatory
+//  - password must match the CURRENT account (a stolen session alone cannot
+//    lock out the real owner)
+//  - only ever targets ctx.user.id (self) — no other user can be affected
+export async function PATCH(req: Request) {
+  return handleRoute(req, {}, async () => {
+    const ctx = await requireSuper()
+    const body = superHandoverSchema.parse(await req.json())
+    const target = await db.user.findUnique({ where: { id: ctx.user.id } })
+    if (!target) return jsonError(404, 'User not found')
+
+    const passwordOk = await bcryptCompare(body.password, target.passwordHash)
+    if (!passwordOk) {
+      await audit({
+        userId: ctx.user.id,
+        actorType: 'USER',
+        action: 'SUPER_ADMIN_HANDOVER_FAILED',
+        entity: 'User',
+        entityId: target.id,
+        ip: getClientIp(req),
+      })
+      return jsonError(401, 'Password incorrect — handover aborted')
+    }
+
+    await db.$transaction([
+      db.user.update({ where: { id: target.id }, data: { isActive: false } }),
+      db.session.updateMany({ where: { userId: target.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+    ])
+
+    await audit({
+      userId: ctx.user.id,
+      actorType: 'USER',
+      action: 'SUPER_ADMIN_DEACTIVATED',
+      entity: 'User',
+      entityId: target.id,
+      meta: { email: target.email, reason: 'handover to fresh platform admin' },
+      ip: getClientIp(req),
+    })
+    return jsonOk({ ok: true, setupReopened: true })
   })
 }
