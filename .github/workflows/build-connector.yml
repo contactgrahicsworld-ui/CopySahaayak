@@ -20,6 +20,11 @@ jobs:
   build:
     name: Build connector (win-x64)
     runs-on: windows-latest
+    # NOTE: `secrets` context is NOT allowed inside step `if:` — GitHub rejects
+    # the whole workflow at startup (run fails with zero jobs). Gate conditional
+    # steps through job-level env instead (env context IS allowed in `if:`).
+    env:
+      HAS_SIGNING_CERT: ${{ secrets.SIGNING_CERT_PFX != '' }}
     permissions:
       contents: write # required for `gh release create/upload` on tag builds
     defaults:
@@ -70,7 +75,7 @@ jobs:
           Get-FileHash download/connector/*.exe -Algorithm SHA256 | Format-Table -AutoSize
 
       - name: Code-sign artifacts (runs only when signing secrets are configured)
-        if: ${{ secrets.SIGNING_CERT_PFX != '' }}
+        if: env.HAS_SIGNING_CERT == 'true'
         env:
           SIGNING_CERT_PFX: ${{ secrets.SIGNING_CERT_PFX }}
           SIGNING_CERT_PASS: ${{ secrets.SIGNING_CERT_PASS }}
