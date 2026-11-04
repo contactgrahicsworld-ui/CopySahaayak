@@ -31,10 +31,12 @@ for s in shops:
     if slug.startswith("e2e-"):
         r = subprocess.run(
             ["curl", "-sS", "--max-time", "60", "-b", jar, "-X", "DELETE",
+             "-H", "Content-Type: application/json",
+             "-d", json.dumps({"confirm": slug}),
              f"{base}/api/super/shops/{sid}"],
             capture_output=True, text=True)
         out = (r.stdout or "").strip()[:80]
-        ok = out.startswith("{\"ok") or '"ok"' in out or "ok" in out.lower()
+        ok = ("ok" in out.lower()) and ("error" not in out.lower())
         print(f"DELETE e2e shop {slug} ({sid}): {out}")
         deleted += 1 if ok else 0
     else:

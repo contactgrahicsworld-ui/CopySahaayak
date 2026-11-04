@@ -253,7 +253,7 @@ async function main() {
 
     // shop B pricing isolation
     const pricingB = await req('/api/admin/pricing', { jar: jarB })
-    check('shop B pricing isolated', pricingB.res.status === 200 && pricingB.data.rules.every((r) => r.shopId))
+    check('shop B pricing isolated', pricingB.res.status === 200 && (pricingB.data?.rules ?? []).every((r) => r.shopId))
   }
 
   // ---------- 7. Payment verification → print job fan-out ----------
@@ -263,7 +263,7 @@ async function main() {
     // Pair a device for shop A
     const pair = await req('/api/admin/devices', { method: 'POST', jar: jarA, body: { name: 'Test Connector' } })
     check('pairing code issued', pair.res.status === 200 && /^[A-Z0-9]{6}$/.test(pair.data?.device?.pairingCode || ''), JSON.stringify(pair.data))
-    const code = pair.data.device.pairingCode
+    const code = pair.data?.device?.pairingCode ?? ''
 
     const dp = await req('/api/device/pair', { method: 'POST', body: { pairingCode: code, machineName: `E2E-PC-${RUN}`, appVersion: '1.0.0' } })
     check('device paired, token issued', dp.res.status === 200 && !!dp.data?.deviceToken, JSON.stringify(dp.data))
