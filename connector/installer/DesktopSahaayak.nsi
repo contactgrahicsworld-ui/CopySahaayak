@@ -17,7 +17,11 @@ RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 
 !define PRODUCT_NAME        "Desktop Sahaayak"
-!define PRODUCT_VERSION     "1.3.0"
+; Version can be overridden by CI: makensis -DPRODUCT_VERSION=1.2.3 ... —
+; keeps installer metadata in lockstep with the csproj (was hardcoded 1.3.0).
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION     "1.3.1"
+!endif
 !define PRODUCT_PUBLISHER   "PrintSahayak Platforms"
 !define PRODUCT_EXE         "PrintSahayakConnector.exe"
 !define PRODUCT_UNINST_KEY  "Software\Microsoft\Windows\CurrentVersion\Uninstall\PrintSahayakConnector"
@@ -38,7 +42,7 @@ InstallDir "$PROGRAMFILES64\PrintSahayak"
 ShowInstDetails show
 ShowUnInstDetails nevershow
 
-VIProductVersion "1.3.0.0"
+VIProductVersion "${PRODUCT_VERSION}.0"
 VIAddVersionKey /LANG=1033 ProductName      "${PRODUCT_NAME}"
 VIAddVersionKey /LANG=1033 ProductVersion   "${PRODUCT_VERSION}"
 VIAddVersionKey /LANG=1033 FileVersion      "${PRODUCT_VERSION}"

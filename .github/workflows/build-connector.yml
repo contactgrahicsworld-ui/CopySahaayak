@@ -42,6 +42,14 @@ jobs:
       - name: Install NSIS
         run: choco install nsis -y --no-progress
 
+      - name: Read app version from csproj
+        run: |
+          [xml]$csproj = Get-Content connector/PrintSahayakConnector/PrintSahayakConnector.csproj
+          $ver = ($csproj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
+          if (-not $ver) { throw "Could not read <Version> from the csproj" }
+          Write-Host "App version: $ver"
+          "APP_VERSION=$ver" >> $env:GITHUB_ENV
+
       - name: Publish (self-contained single file)
         run: >
           dotnet publish connector/PrintSahayakConnector
@@ -55,17 +63,25 @@ jobs:
         run: |
           $exe = "connector/publish/PrintSahayakConnector.exe"
           if (-not (Test-Path $exe)) { throw "Publish output missing: $exe" }
+          $vi = (Get-Item $exe).VersionInfo
           Get-Item $exe | Select-Object Name, Length
+          if (-not $vi.FileVersion.StartsWith($env:APP_VERSION)) {
+            throw "EXE version $($vi.FileVersion) does not match csproj version $env:APP_VERSION"
+          }
 
       - name: Build installer (NSIS)
         run: |
           $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
           if (-not (Test-Path $makensis)) { throw "makensis not found at $makensis" }
           Push-Location connector/installer
-          & $makensis -V2 DesktopSahaayak.nsi
+          & $makensis -V2 -DPRODUCT_VERSION=$env:APP_VERSION DesktopSahaayak.nsi
           $code = $LASTEXITCODE
           Pop-Location
           if ($code -ne 0) { exit $code }
+          $setupVi = (Get-Item connector/installer/DesktopSahaayak-Setup.exe).VersionInfo
+          if ($setupVi.FileVersion -ne "$env:APP_VERSION.0") {
+            throw "Setup version $($setupVi.FileVersion) does not match $env:APP_VERSION.0"
+          }
 
       - name: Collect artifacts
         run: |
