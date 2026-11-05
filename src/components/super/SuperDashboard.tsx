@@ -761,9 +761,18 @@ function PlatformSettingsTab() {
     setSaving(true)
     try {
       for (const [key, value] of Object.entries(form)) {
-        await fetch('/api/super/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }) })
+        const res = await fetch('/api/super/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }) })
+        // A rejected PUT (rate limit, expired session, validation) must never
+        // masquerade as success — surface the server error and stop saving.
+        if (!res.ok) {
+          const d = await res.json().catch(() => null)
+          toast({ title: 'Save failed', description: d?.error || `Server error (HTTP ${res.status})`, variant: 'destructive' })
+          return
+        }
       }
       toast({ title: 'Platform settings saved' })
+    } catch {
+      toast({ title: 'Save failed', description: 'Network error — check your connection and try again.', variant: 'destructive' })
     } finally {
       setSaving(false)
     }

@@ -7,10 +7,10 @@ import { Download, MonitorCheck, TriangleAlert, Trash2, BookOpen } from 'lucide-
 export const metadata = { title: 'Windows Connector — CopySahaayak' }
 
 const steps = [
-  'Download PrintSahayak-Setup.exe below.',
+  'Download DesktopSahaayak-Setup.exe below.',
   'Double-click the installer. Windows may show a SmartScreen warning because the installer is not code-signed — click "More info" → "Run anyway".',
   'The connector starts automatically after install and lives in your system tray.',
-  'In the Shop Admin dashboard open Printers & Devices → "Pair connector" and copy the 6-character code (valid 15 minutes).',
+  'In the Shop Admin dashboard open the Printers tab → "Pair connector" and copy the 6-character code (valid 15 minutes).',
   'Enter the code in the connector pairing window, then tag each Windows printer as Black & White or Colour.',
   'Verified orders start printing automatically. A job is confirmed only after the Windows spooler reports it finished.',
 ]
@@ -33,7 +33,7 @@ export default function DownloadPage() {
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
           <Button asChild size="lg" className="flex-1">
             <a href="/api/downloads/connector" download>
-              <Download className="h-4 w-4 mr-2" aria-hidden /> PrintSahayak-Setup.exe
+              <Download className="h-4 w-4 mr-2" aria-hidden /> DesktopSahaayak-Setup.exe
             </a>
           </Button>
         </div>
