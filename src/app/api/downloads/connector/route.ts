@@ -1,6 +1,6 @@
 // Serves the Windows connector installer.
 // Priority: local artifact on disk (self-hosted builds) → redirect to the
-// GitHub-hosted installer (kept in-repo; under the 100 MB Git limit).
+// GitHub "latest" release (always the newest tag — no per-release code change).
 import fs from 'fs'
 import path from 'path'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
@@ -9,7 +9,10 @@ import { RATE_LIMITS } from '@/lib/rate-limit'
 export const dynamic = 'force-dynamic'
 
 const INSTALLER_NAME = 'DesktopSahaayak-Setup.exe'
-const GITHUB_RAW = process.env.CONNECTOR_DOWNLOAD_URL || 'https://github.com/contactgrahicsworld-ui/CopySahaayak/releases/download/connector-v1.3.0/DesktopSahaayak-Setup.exe'
+// /releases/latest/download/<asset> is GitHub's stable redirect to the newest
+// published release asset — deploying a new tag updates the download without
+// touching this file (was hardcoded to connector-v1.3.0 and shipped stale builds).
+const GITHUB_RAW = process.env.CONNECTOR_DOWNLOAD_URL || 'https://github.com/contactgrahicsworld-ui/CopySahaayak/releases/latest/download/DesktopSahaayak-Setup.exe'
 
 function findInstaller(): string | null {
   const candidates = [
