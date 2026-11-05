@@ -51,7 +51,7 @@ ShowUnInstDetails nevershow
 VIProductVersion "${PRODUCT_VERSION}.0"
 VIAddVersionKey /LANG=1033 ProductName      "${PRODUCT_NAME}"
 VIAddVersionKey /LANG=1033 ProductVersion   "${PRODUCT_VERSION}"
-VIAddVersionKey /LANG=1033 FileVersion      "${PRODUCT_VERSION}"
+VIAddVersionKey /LANG=1033 FileVersion      "${PRODUCT_VERSION}.0"
 VIAddVersionKey /LANG=1033 FileDescription  "Installer for the ${PRODUCT_NAME}"
 VIAddVersionKey /LANG=1033 CompanyName      "${PRODUCT_PUBLISHER}"
 VIAddVersionKey /LANG=1033 LegalCopyright   "MIT License - Copyright (c) 2026 ${PRODUCT_PUBLISHER}"
