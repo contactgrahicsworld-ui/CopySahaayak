@@ -2,8 +2,9 @@
 # Usage: bash scripts/run-regression-10x.sh <startRun> <endRun>
 # Production E2E regression in chunks (sandbox-safe: sync, per-call).
 cd /home/z/my-project
+set -a; source .env 2>/dev/null; set +a
+# E2E is API-only against the live site — never let a local file: DB leak in.
 unset DATABASE_URL DIRECT_URL
-set -a; source .env; set +a
 BASE_URL="${BASE_URL:-https://copysahaayak.vercel.app}"
 export BASE_URL
 export E2E_SUPER_EMAIL="super@copysahaayak.app"
