@@ -74,7 +74,7 @@ jobs:
           $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
           if (-not (Test-Path $makensis)) { throw "makensis not found at $makensis" }
           Push-Location connector/installer
-          & $makensis -V2 -DPRODUCT_VERSION=$env:APP_VERSION DesktopSahaayak.nsi
+          & $makensis -V2 "-DPRODUCT_VERSION=$env:APP_VERSION" DesktopSahaayak.nsi
           $code = $LASTEXITCODE
           Pop-Location
           if ($code -ne 0) { exit $code }

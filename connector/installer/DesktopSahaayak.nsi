@@ -17,8 +17,14 @@ RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 
 !define PRODUCT_NAME        "Desktop Sahaayak"
-; Version can be overridden by CI: makensis -DPRODUCT_VERSION=1.2.3 ... —
-; keeps installer metadata in lockstep with the csproj (was hardcoded 1.3.0).
+; Version resolution order:
+;   1. -DPRODUCT_VERSION=x.y.z command-line override (CI passes it quoted)
+;   2. parsed straight from the csproj <Version> — always in lockstep with the app
+;      (the installer metadata was previously hardcoded and drifted from the app)
+;   3. fallback 1.3.1
+!ifndef PRODUCT_VERSION
+  !searchparse /nonfatal /file "..\PrintSahayakConnector\PrintSahayakConnector.csproj" "<Version>" PRODUCT_VERSION "</Version>"
+!endif
 !ifndef PRODUCT_VERSION
   !define PRODUCT_VERSION     "1.3.1"
 !endif
