@@ -9,7 +9,7 @@ JAR="${JAR:-/tmp/jar-super.txt}"
 login() {
   curl -sS --max-time 30 -c "$JAR" -X POST "$BASE/api/auth/login" \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"${E2E_SUPER_EMAIL:-vedpackagingindustries@gmail.com}\",\"password\":\"${E2E_SUPER_PASSWORD:-Cs-Super-gTmYb70V3eKd}\"}" > /dev/null
+    -d "{\"email\":\"${E2E_SUPER_EMAIL:-super@copysahaayak.app}\",\"password\":\"${E2E_SUPER_PASSWORD:-Cs-Platform-2026!Vn7qZ}\"}" > /dev/null
 }
 
 # Reuse a valid session; only spend a login attempt when the jar is stale.
