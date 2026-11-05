@@ -1,6 +1,6 @@
 // Device heartbeat: pushes its printer inventory (server upserts) and reports
 // liveness. Returns device status so a revoked device stops working instantly.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk } from '@/lib/api'
 import { authenticateDevice } from '@/lib/auth'
 import { heartbeatSchema } from '@/lib/validation'
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
           await tx.printer.update({ where: { id: m.id }, data: { status: 'OFFLINE' } })
         }
       }
-    })
+    }, TX)
 
     const pending = await db.printJob.count({ where: { shopId: device.shopId, status: 'QUEUED' } })
     return Response.json({ ok: true, deviceStatus: device.status, pendingJobs: pending })

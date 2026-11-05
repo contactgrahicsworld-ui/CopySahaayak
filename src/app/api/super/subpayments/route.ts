@@ -1,6 +1,6 @@
 // Subscription payments: queue + verify/reject. VERIFY activates/extends the
 // shop subscription. Never auto-approves; audit-logged.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
 import { verifyPaymentActionSchema } from '@/lib/validation'
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
         await tx.notification.create({
           data: { shopId: payment.shopId, audience: 'SHOP', title: `${payment.plan.name} plan activated`, body: `Valid until ${expiresAt.toLocaleDateString('en-IN')}` },
         })
-      })
+      }, TX)
     } else {
       await db.$transaction(async (tx) => {
         await tx.subscriptionPayment.update({
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         await tx.notification.create({
           data: { shopId: payment.shopId, audience: 'SHOP', title: 'Subscription payment rejected', body: body.note || 'UTR not found — please re-check and resubmit' },
         })
-      })
+      }, TX)
     }
     await audit({
       shopId: payment.shopId,

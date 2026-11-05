@@ -24,7 +24,7 @@ async function sbFetch(path: string, opts: { method?: string; key?: string; body
       Authorization: `Bearer ${opts.key || SERVICE_KEY}`,
       ...(opts.contentType ? { 'Content-Type': opts.contentType } : {}),
     },
-    body: opts.body,
+    body: (typeof opts.body === 'string' ? opts.body : opts.body ? new Uint8Array(opts.body.buffer.slice(opts.body.byteOffset, opts.body.byteOffset + opts.body.byteLength) as ArrayBuffer) : undefined),
   })
   const buf = Buffer.from(await res.arrayBuffer())
   return { status: res.status, body: buf, json: () => { try { return JSON.parse(buf.toString('utf8')) } catch { return null } } }

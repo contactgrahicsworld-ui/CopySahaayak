@@ -1,5 +1,5 @@
 // Revoke (or delete) a device connector — kills its token immediately.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireAnyShopAdmin } from '@/lib/auth'
 import { audit } from '@/lib/audit'
@@ -22,7 +22,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       })
       await tx.printer.updateMany({ where: { deviceId: device.id }, data: { status: 'OFFLINE', deviceId: null } })
       await tx.device.update({ where: { id: device.id }, data: { status: 'REVOKED', tokenHash: null, pairingCode: null } })
-    })
+    }, TX)
     await audit({
       shopId: ctx.user.shopId,
       userId: ctx.user.id,

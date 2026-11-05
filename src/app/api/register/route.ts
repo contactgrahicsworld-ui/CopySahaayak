@@ -1,7 +1,7 @@
 // Shop self-registration: creates the shop (ACTIVE, Free plan) + its owner
 // account. No super-admin approval needed to start; the super admin can
 // suspend shops from the platform dashboard. Credentials are never predefined.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { registerSchema } from '@/lib/validation'
 import { bcryptHash, getClientIp, randomToken, sha256 } from '@/lib/security'
@@ -13,6 +13,7 @@ import { RATE_LIMITS } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export async function POST(req: Request) {
   return handleRoute(
@@ -35,6 +36,8 @@ export async function POST(req: Request) {
       if (!freePlan) return jsonError(500, 'Plans are not provisioned yet')
 
       const now = new Date()
+      // Hash BEFORE opening the transaction — bcrypt must not hold the DB connection.
+      const passwordHash = await bcryptHash(body.password)
       const user = await db.$transaction(async (tx) => {
         const shop = await tx.shop.create({
           data: {
@@ -55,7 +58,7 @@ export async function POST(req: Request) {
         return tx.user.create({
           data: {
             email,
-            passwordHash: await bcryptHash(body.password),
+            passwordHash,
             name: body.ownerName,
             phone: body.shopPhone || null,
             role: 'SHOP_ADMIN',
@@ -63,10 +66,10 @@ export async function POST(req: Request) {
             memberships: { create: { shopId: shop.id, role: 'OWNER' } },
           },
         })
-      })
+      }, TX)
 
       await ensureSupabaseAuthUser(email) // enables email OTP password reset (best effort)
-      await audit({ shopId: user.shopId, actorType: 'USER', userId: user.id, action: 'SHOP_REGISTERED', entity: 'Shop', entityId: user.shopId, ip: getClientIp(req) })
+      await audit({ shopId: user.shopId, actorType: 'USER', userId: user.id, action: 'SHOP_REGISTERED', entity: 'Shop', entityId: user.shopId!, ip: getClientIp(req) })
 
       // Auto sign-in so the owner lands straight in their dashboard
       const token = await createAdminSession(user.id, getClientIp(req), req.headers.get('user-agent') || undefined)

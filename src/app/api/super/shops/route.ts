@@ -1,5 +1,5 @@
 // Shop management: list with subscription info; create shop + owner account.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
 import { createShopSchema } from '@/lib/validation'
@@ -7,6 +7,7 @@ import { bcryptHash, getClientIp } from '@/lib/security'
 import { audit } from '@/lib/audit'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export async function GET(req: Request) {
   return handleRoute(req, {}, async () => {
@@ -41,6 +42,9 @@ export async function POST(req: Request) {
     const plan = await db.plan.findUnique({ where: { code: body.planCode } })
     if (!plan) return jsonError(404, 'Plan not found')
 
+    // Hash BEFORE opening the transaction — bcrypt holds the DB connection otherwise.
+    const passwordHash = await bcryptHash(body.adminPassword)
+
     const result = await db.$transaction(async (tx) => {
       const shop = await tx.shop.create({
         data: {
@@ -54,7 +58,7 @@ export async function POST(req: Request) {
       const admin = await tx.user.create({
         data: {
           email: body.adminEmail.toLowerCase(),
-          passwordHash: await bcryptHash(body.adminPassword),
+          passwordHash,
           name: body.ownerName || body.name,
           role: 'SHOP_ADMIN',
           shopId: shop.id,
@@ -85,7 +89,7 @@ export async function POST(req: Request) {
         await tx.pricingRule.create({ data: { shopId: shop.id, ...p } })
       }
       return { shop, admin }
-    })
+    }, TX)
 
     await audit({
       shopId: result.shop.id,

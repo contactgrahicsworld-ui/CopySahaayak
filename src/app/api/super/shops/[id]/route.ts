@@ -1,5 +1,5 @@
 // Activate / suspend a shop; reset owner password; DELETE (full offboard).
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
 import { audit } from '@/lib/audit'
@@ -114,7 +114,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
         c.users = (await tx.user.deleteMany({ where: { shopId: id } })).count
         await tx.shop.delete({ where: { id } })
         return c
-      }, { maxWait: 15000, timeout: 60000 })
+      }, TX)
     } catch (err) {
       console.error('[super] shop delete failed:', err)
       // The platform owner needs the real reason (which step failed) — safe:

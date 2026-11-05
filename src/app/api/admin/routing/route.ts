@@ -1,5 +1,5 @@
 // Routing rules: which printer handles which colour/size. Simple list API.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireAnyShopAdmin } from '@/lib/auth'
 import { routingRuleSchema } from '@/lib/validation'
@@ -47,7 +47,7 @@ export async function PUT(req: Request) {
           },
         })
       }
-    })
+    }, TX)
     const rules = await db.routingRule.findMany({
       where: { shopId: ctx.user.shopId },
       include: { printer: { select: { id: true, windowsName: true, displayName: true, colorMode: true } } },

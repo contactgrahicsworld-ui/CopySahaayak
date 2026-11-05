@@ -23,7 +23,7 @@ export async function GET(req: Request) {
         createdAt: true,
         totalPaise: true,
         status: true,
-        items: { select: { colorMode: true, paperSize: true, pageCount: true, copies: true, totalPaise: true } },
+        items: { select: { colorMode: true, paperSize: true, pageCount: true, copies: true, totalPaise: true, duplex: true } },
       },
     })
 

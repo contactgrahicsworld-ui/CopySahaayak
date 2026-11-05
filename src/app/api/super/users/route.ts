@@ -2,7 +2,7 @@
 // The super admin can reset any user's password — this is the always-available
 // fallback when no email provider is configured, mirroring standard SaaS admin
 // panels. Every action is audit-logged; reset revokes all sessions.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
 import { superResetPasswordSchema, superHandoverSchema } from '@/lib/validation'

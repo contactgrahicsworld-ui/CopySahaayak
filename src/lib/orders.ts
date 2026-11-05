@@ -1,6 +1,6 @@
 // Order lifecycle: creation, UPI QR, UTR submission, verification, print job fan-out,
 // spooler-verified completion. All state transitions live here — API routes stay thin.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { LIMITS, type ColorMode, type PaperSize } from '@/lib/constants'
 import { HttpError } from '@/lib/auth'
 import { calculatePrice } from '@/lib/pricing'
@@ -154,7 +154,7 @@ export async function createOrder(input: CreateOrderInput) {
       data: { shopId: shop.id, audience: 'SHOP', title: `New order ${created.orderNumber}`, body: `Amount ₹${(total / 100).toFixed(2)} — awaiting UPI payment` },
     })
     return created
-  })
+  }, TX)
 
   await audit({
     shopId: shop.id,
@@ -197,7 +197,7 @@ export async function submitUtr(orderId: string, utr: string, payerName?: string
       data: { shopId: payment.shopId, audience: 'SHOP', title: `Payment submitted for ${payment.order.orderNumber}`, body: `UTR ${utr} — verify in Payments tab` },
     })
     return p
-  })
+  }, TX)
   await audit({
     shopId: payment.shopId,
     actorType: 'CUSTOMER',
@@ -245,7 +245,7 @@ export async function verifyPayment(
     await tx.paymentVerification.create({
       data: { paymentId: payment.id, action, adminUserId: adminUser.id, note: note || null },
     })
-  })
+  }, TX)
 
   if (action === 'VERIFY') {
     await enqueuePrintJobs(payment.orderId)
@@ -342,7 +342,7 @@ export async function recordPrintEvent(jobId: string, status: 'SPOOLING' | 'COMP
         await tx.order.update({ where: { id: job.orderId }, data: { status: 'COMPLETED', completedAt: new Date() } })
       }
     }
-  })
+  }, TX)
 }
 
 export async function ensureSubscriptionUsable(shopId: string, subscription: { status: string; expiresAt: Date | null } | null) {

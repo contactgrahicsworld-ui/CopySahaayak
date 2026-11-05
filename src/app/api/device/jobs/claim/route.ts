@@ -1,5 +1,5 @@
 // Claim a print job. Atomic via transaction + lease; dedupes by completed state.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonError } from '@/lib/api'
 import { authenticateDevice } from '@/lib/auth'
 import { RATE_LIMITS } from '@/lib/rate-limit'
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
         },
         include: { orderItem: true, document: true, printer: true, order: true },
       })
-    })
+    }, TX)
 
     if (!job) return Response.json({ job: null })
     if (job.attempts > job.maxAttempts) {

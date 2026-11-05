@@ -57,7 +57,7 @@ async function sbUpload(objectPath: string, buf: Buffer, contentType: string): P
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${DOCUMENTS_BUCKET}/${objectPath}`, {
     method: 'POST',
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': contentType },
-    body: buf,
+    body: buf as unknown as BodyInit,
   })
   if (res.status !== 200) throw new Error(`Supabase upload failed (${res.status})`)
 }
@@ -89,8 +89,8 @@ export async function storageUpload(objectPath: string, buf: Buffer, contentType
   if (STORAGE_DRIVER === 'supabase') return sbUpload(objectPath, buf, contentType)
   await db.storedObject.upsert({
     where: { key: objectPath },
-    update: { bytes: buf, mimeType: contentType, sizeBytes: buf.length },
-    create: { key: objectPath, bytes: buf, mimeType: contentType, sizeBytes: buf.length },
+    update: { bytes: new Uint8Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer), mimeType: contentType, sizeBytes: buf.length },
+    create: { key: objectPath, bytes: new Uint8Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer), mimeType: contentType, sizeBytes: buf.length },
   })
 }
 

@@ -1,6 +1,6 @@
 // Order actions for the shop: cancel, mark completed, reprint (requeue jobs),
 // and print-job visibility. All scoped to the admin's own shop.
-import { db } from '@/lib/db'
+import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireAnyShopAdmin, HttpError } from '@/lib/auth'
 import { enqueuePrintJobs } from '@/lib/orders'
@@ -49,7 +49,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         await db.$transaction(async (tx) => {
           await tx.order.update({ where: { id }, data: { status: 'CANCELLED' } })
           await tx.printJob.updateMany({ where: { orderId: id, status: { in: ['QUEUED', 'CLAIMED'] } }, data: { status: 'CANCELLED' } })
-        })
+        }, TX)
         break
       }
       case 'COMPLETE': {
@@ -57,7 +57,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         await db.$transaction(async (tx) => {
           await tx.order.update({ where: { id }, data: { status: 'COMPLETED', completedAt: new Date() } })
           await tx.printJob.updateMany({ where: { orderId: id, status: { in: ['QUEUED', 'CLAIMED', 'SPOOLING'] } }, data: { status: 'CANCELLED' } })
-        })
+        }, TX)
         break
       }
       case 'REQUEUE_JOBS': {
