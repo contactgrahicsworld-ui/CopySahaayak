@@ -176,9 +176,13 @@ public sealed class TrayContext : ApplicationContext
         _tray.ShowBalloonTip(
             6000,
             Program.AppTitle,
-            $"Paired with “{_store.ShopName}”. Print jobs will show up here.",
+            $"Paired with “{_store.ShopName}”. Now choose your printers.",
             ToolTipIcon.Info);
         UpdateTrayText(_worker!.Status);
+
+        // The shop cannot receive a single job until printers are mapped — open the
+        // printer settings right away instead of hoping the user finds the tray menu.
+        ShowPrinterMapping();
     }
 
     private void ShowPrinterMapping()
@@ -195,6 +199,9 @@ public sealed class TrayContext : ApplicationContext
         _mappingForm.FormClosed += (_, _) => _mappingForm = null;
         _mappingForm.Show();
     }
+
+    /// <summary>Number of printers currently mapped for jobs (shown in the status window).</summary>
+    public int MappedPrinterCount => _store.GetPrinters().Count;
 
     private void ShowStatus()
     {

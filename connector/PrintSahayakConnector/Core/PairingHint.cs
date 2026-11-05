@@ -60,7 +60,10 @@ public static class PairingHint
                 view.ReadArray(4, bytes, 0, length);
                 view.Write(0, 0); // consume
                 var link = Encoding.UTF8.GetString(bytes);
-                if (link.StartsWith(DeepLinkParser.Scheme + "://", StringComparison.OrdinalIgnoreCase))
+                // Accept both the current and the legacy scheme — a dashboard opened
+                // before an upgrade still hands over photocopyconnector:// links.
+                if (link.StartsWith(DeepLinkParser.Scheme + "://", StringComparison.OrdinalIgnoreCase) ||
+                    link.StartsWith(DeepLinkParser.LegacyScheme + "://", StringComparison.OrdinalIgnoreCase))
                 {
                     return link;
                 }

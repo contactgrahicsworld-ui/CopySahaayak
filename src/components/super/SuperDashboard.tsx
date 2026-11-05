@@ -94,6 +94,7 @@ function OverviewTab() {
     storage: { totalBytes: number; documents: number }
     gmvDaily: Array<{ date: string; paise: number }>
   } | null>(null)
+  const [platformUpi, setPlatformUpi] = useState<string | null>(null)
 
   useEffect(() => {
     const load = () => fetch('/api/super/stats', { cache: 'no-store' }).then((r) => r.json()).then(setStats).catch(() => {})
@@ -102,10 +103,23 @@ function OverviewTab() {
     return () => clearInterval(t)
   }, [])
 
+  useEffect(() => {
+    fetch('/api/super/settings', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => d.settings && setPlatformUpi(d.settings.super_admin_upi_vpa || ''))
+      .catch(() => {})
+  }, [])
+
   if (!stats) return <CenterSpinner />
   const max = Math.max(1, ...stats.gmvDaily.map((d) => d.paise))
   return (
     <div className="space-y-4">
+      {platformUpi === '' && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>Platform UPI ID is not set.</strong> Shop owners cannot pay for plans until you add your
+          UPI ID in Settings → “Platform UPI ID (subscription payments)”. This blocks all plan payments — set it first.
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MiniStat label="Shops (active/total)" value={`${stats.shops.active}/${stats.shops.total}`} />
         <MiniStat label="Active subscriptions" value={String(stats.subscriptions.active)} />

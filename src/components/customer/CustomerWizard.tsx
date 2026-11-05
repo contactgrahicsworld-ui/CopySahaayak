@@ -476,6 +476,22 @@ function PayStage({
             <a href={order.upi.payload} className="block">
               <Button variant="outline" className="w-full">Open UPI app to pay</Button>
             </a>
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <span className="font-mono text-foreground">{order.upi.vpa}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5"
+                onClick={() => {
+                  navigator.clipboard?.writeText(order.upi!.vpa).then(
+                    () => toast({ title: 'UPI ID copied', description: 'Paste it in any UPI app and pay the exact amount.' }),
+                    () => {}
+                  )
+                }}
+              >
+                <Copy className="h-3 w-3" aria-hidden /> Copy UPI ID
+              </Button>
+            </div>
             <Separator />
             <div className="text-left space-y-1.5">
               <Label htmlFor="utr" className="text-sm font-medium">Enter UPI reference / UTR number</Label>

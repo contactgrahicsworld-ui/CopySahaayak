@@ -603,11 +603,16 @@ function PrintersTab() {
           ) : (
             devices.map((d) => (
               <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{d.name} <span className="text-muted-foreground">({d.machineName || 'unknown PC'})</span></p>
                   <p className="text-xs text-muted-foreground">
                     v{d.appVersion || '?'} · last seen {d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString('en-IN') : 'never'} · {d.printers.length} printer(s)
                   </p>
+                  {d.status === 'ACTIVE' && d.printers.length === 0 && (
+                    <p className="mt-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                      ⚠ No printers configured — jobs cannot print. On the shop PC open Desktop Sahaayak (system tray) → Printer Settings… → tick a printer → Save.
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={d.status === 'ACTIVE' ? 'default' : d.status === 'PENDING' ? 'secondary' : 'destructive'}>{d.status}</Badge>
@@ -628,7 +633,10 @@ function PrintersTab() {
         </CardHeader>
         <CardContent className="space-y-2">
           {printers.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Printers appear here after a connector pairs and heartbeats.</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Printers appear here after a connector pairs <em>and</em> the shop owner ticks printers in
+              Desktop Sahaayak → Printer Settings… on the shop PC (v1.3.1 or newer opens it automatically after pairing).
+            </p>
           ) : (
             printers.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-3">

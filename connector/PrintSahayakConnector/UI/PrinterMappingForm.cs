@@ -116,10 +116,18 @@ public sealed class PrinterMappingForm : Form
         _grid.AllowUserToDeleteRows = false;
         _grid.AllowUserToResizeRows = false;
         _grid.RowHeadersVisible = false;
-        _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        _grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
         _grid.MultiSelect = false;
         _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         _grid.BackgroundColor = SystemColors.Window;
+
+        // A single click must immediately toggle the checkbox / open the dropdown.
+        // The default EditOnKeystrokeOrF2 mode requires two clicks, which shop owners
+        // read as "printer selection is not working" — the bug report that led here.
+        _grid.EditMode = DataGridViewEditMode.EditOnEnter;
+        _grid.CellContentClick += Grid_CellContentClick;
+        _grid.CellClick += Grid_CellClick;
+        _grid.EditingControlShowing += Grid_EditingControlShowing;
 
         var enabledColumn = new DataGridViewCheckBoxColumn
         {
@@ -171,6 +179,44 @@ public sealed class PrinterMappingForm : Form
         };
     }
 
+    /// <summary>
+    /// Toggles the "Use" checkbox on the FIRST click (EditOnEnter alone still needs a
+    /// second click to flip a checkbox cell).
+    /// </summary>
+    private void Grid_CellContentClick(object? sender, DataGridViewCellEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+        if (_grid.Columns[e.ColumnIndex].Name != ColEnabled) return;
+
+        _grid.EndEdit(); // close any pending edit so the value below wins
+        var cell = _grid.Rows[e.RowIndex].Cells[ColEnabled];
+        cell.Value = cell.Value is not true;
+        _grid.EndEdit(); // commit the toggle immediately
+    }
+
+    /// <summary>Opens the colour/paper dropdown on the first click instead of the third.</summary>
+    private void Grid_CellClick(object? sender, DataGridViewCellEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+        var name = _grid.Columns[e.ColumnIndex].Name;
+        if (name != ColColor && name != ColPaper) return;
+
+        _grid.BeginEdit(true);
+        if (_grid.EditingControl is DataGridViewComboBoxEditingControl combo)
+        {
+            combo.DroppedDown = true;
+        }
+    }
+
+    /// <summary>Combo cells must only accept the predefined choices (no free typing).</summary>
+    private void Grid_EditingControlShowing(object? sender, DataGridViewEditingControlShowingEventArgs e)
+    {
+        if (e.Control is DataGridViewComboBoxEditingControl combo)
+        {
+            combo.DropDownStyle = ComboBoxStyle.DropDownList;
+        }
+    }
+
     /// <summary>Rebuilds the grid from the installed printers plus the saved mappings.</summary>
     private void ReloadGrid()
     {
@@ -210,10 +256,16 @@ public sealed class PrinterMappingForm : Form
         }
 
         var count = _grid.Rows.Count;
+        var enabledCount = 0;
+        foreach (DataGridViewRow row in _grid.Rows)
+        {
+            if (row.Cells[ColEnabled].Value is true) enabledCount++;
+        }
         _infoLabel.Text = count == 0
             ? "No printers are installed on this computer. Install a printer in Windows first, then click Rescan."
-            : $"{count} printer(s) found — tick the ones that should receive jobs. " +
-              "BW forces greyscale, COLOR is for colour jobs, ANY accepts everything.";
+            : enabledCount == 0
+                ? $"{count} printer(s) found — tick “Use” on at least one printer, choose its colour mode, then click Save."
+                : $"{count} printer(s) found, {enabledCount} enabled — click Save to push them to the shop server.";
         _saveButton.Enabled = count > 0;
     }
 
@@ -252,6 +304,10 @@ public sealed class PrinterMappingForm : Form
     /// <summary>Persists the enabled printers and raises <see cref="Saved"/>.</summary>
     private void Save()
     {
+        // Flush a combo cell still in edit mode (user changed the dropdown but the
+        // grid has not committed yet) — otherwise the OLD value would be saved.
+        _grid.EndEdit();
+
         var mappings = new List<PrinterMapping>();
         foreach (DataGridViewRow row in _grid.Rows)
         {

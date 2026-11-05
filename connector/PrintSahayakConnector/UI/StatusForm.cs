@@ -21,6 +21,7 @@ public sealed class StatusForm : Form
     private readonly Label _machineValue = new();
     private readonly Label _autoStartValue = new();
     private readonly Label _stateValue = new();
+    private readonly Label _printersValue = new();
     private readonly Label _activityValue = new();
     private readonly Label _heartbeatValue = new();
     private readonly Label _checkValue = new();
@@ -40,16 +41,16 @@ public sealed class StatusForm : Form
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(520, 318);
+        ClientSize = new Size(520, 342);
         Icon = TryLoadIcon();
 
         var layout = new TableLayoutPanel
         {
             Location = new Point(16, 16),
-            Size = new Size(488, 232),
+            Size = new Size(488, 256),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             ColumnCount = 2,
-            RowCount = 9,
+            RowCount = 10,
             AutoSize = true,
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
@@ -61,19 +62,20 @@ public sealed class StatusForm : Form
         AddRow(layout, "This computer", _machineValue);
         AddRow(layout, "Start with Windows", _autoStartValue);
         AddRow(layout, "Connection", _stateValue);
+        AddRow(layout, "Printers configured", _printersValue);
         AddRow(layout, "Pending activity", _activityValue);
         AddRow(layout, "Last heartbeat", _heartbeatValue);
         AddRow(layout, "Last job check", _checkValue);
 
         _openLogsButton.Text = "Open Logs";
         _openLogsButton.Size = new Size(104, 28);
-        _openLogsButton.Location = new Point(16, 272);
+        _openLogsButton.Location = new Point(16, 296);
         _openLogsButton.UseVisualStyleBackColor = true;
         _openLogsButton.Click += (_, _) => Logger.OpenLogFolder();
 
         _closeButton.Text = "Close";
         _closeButton.Size = new Size(88, 28);
-        _closeButton.Location = new Point(416, 272);
+        _closeButton.Location = new Point(416, 296);
         _closeButton.UseVisualStyleBackColor = true;
         _closeButton.Click += (_, _) => Close();
         CancelButton = _closeButton;
@@ -138,6 +140,8 @@ public sealed class StatusForm : Form
         {
             _stateValue.Text = _store.IsPaired ? "Starting…" : "Not paired";
             _stateValue.ForeColor = SystemColors.ControlText;
+            _printersValue.Text = _store.IsPaired ? $"{_store.GetPrinters().Count}" : "—";
+            _printersValue.ForeColor = SystemColors.ControlText;
             _activityValue.Text = "—";
             _heartbeatValue.Text = "Never";
             _checkValue.Text = "Never";
@@ -152,6 +156,12 @@ public sealed class StatusForm : Form
             WorkerState.Downloading or WorkerState.Printing or WorkerState.Reporting => Color.ForestGreen,
             _ => SystemColors.ControlText,
         };
+
+        var mapped = _store.GetPrinters().Count;
+        _printersValue.Text = mapped == 0
+            ? "NONE — open Printer Settings… and tick at least one printer"
+            : $"{mapped} ready to receive jobs";
+        _printersValue.ForeColor = mapped == 0 && _store.IsPaired ? Color.Firebrick : SystemColors.ControlText;
 
         _activityValue.Text = string.IsNullOrWhiteSpace(status.Detail) ? "—" : status.Detail;
         _heartbeatValue.Text = DescribeTime(status.LastHeartbeatUtc);

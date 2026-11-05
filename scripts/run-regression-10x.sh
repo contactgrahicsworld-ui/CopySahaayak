@@ -6,8 +6,8 @@ unset DATABASE_URL DIRECT_URL
 set -a; source .env; set +a
 BASE_URL="${BASE_URL:-https://copysahaayak.vercel.app}"
 export BASE_URL
-export E2E_SUPER_EMAIL="vedpackagingindustries@gmail.com"
-export E2E_SUPER_PASSWORD="Cs-Super-gTmYb70V3eKd"
+export E2E_SUPER_EMAIL="super@copysahaayak.app"
+export E2E_SUPER_PASSWORD="Cs-Platform-2026!Vn7qZ"
 
 START=${1:-1}
 END=${2:-10}
