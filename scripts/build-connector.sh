@@ -43,7 +43,11 @@ fi
 
 echo "==> NSIS installer"
 cd "$INSTALLER_DIR"
-makensis -V2 DesktopSahaayak.nsi
+# Debian NSIS 3.12's !searchparse mis-parses "/nonfatal /file …", so pass the
+# version explicitly (the .nsi honours a -DPRODUCT_VERSION command-line override).
+VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' "$PROJECT_DIR/PrintSahayakConnector.csproj" | head -1)
+echo "    version: $VERSION"
+makensis -V2 -DPRODUCT_VERSION="$VERSION" DesktopSahaayak.nsi
 
 SETUP="$INSTALLER_DIR/DesktopSahaayak-Setup.exe"
 if [[ ! -f "$SETUP" ]]; then

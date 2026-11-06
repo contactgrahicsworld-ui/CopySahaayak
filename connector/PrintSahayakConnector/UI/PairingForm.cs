@@ -61,10 +61,10 @@ public sealed class PairingForm : Form
             Size = new Size(428, 40),
         };
 
-        var serverCaption = MakeCaption("Shop server URL", 64);
+        var serverCaption = MakeCaption("Shop server URL (site address only — no page path)", 64);
         _serverBox.Location = new Point(16, 82);
         _serverBox.Size = new Size(428, 23);
-        _serverBox.Text = prefill?.ServerUrl ?? "https://";
+        _serverBox.Text = prefill?.ServerUrl ?? "https://copysahaayak.vercel.app";
 
         var codeCaption = MakeCaption("Pairing code (6 characters)", 112);
         _codeBox.Location = new Point(16, 130);
@@ -170,7 +170,7 @@ public sealed class PairingForm : Form
 
         if (serverInput.Length == 0 || serverInput.Equals("https://", StringComparison.Ordinal))
         {
-            ShowError("Please enter the URL of your shop server (e.g. https://print.myshop.com).");
+            ShowError("Please enter the URL of your shop server — ONLY the site address (e.g. https://copysahaayak.vercel.app).");
             _serverBox.Focus();
             return;
         }

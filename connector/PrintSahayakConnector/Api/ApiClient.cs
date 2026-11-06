@@ -84,6 +84,17 @@ public sealed class ApiClient : IDisposable
                 "Only HTTPS servers are allowed (http://localhost is accepted for development).");
         }
 
+        // A path beyond the root almost always means a customer-facing page URL was
+        // pasted (e.g. https://host/s/shop-name) — jobs would then hit the wrong
+        // endpoints. Reject it with an actionable message instead of failing later.
+        var path = uri.AbsolutePath.TrimEnd('/');
+        if (!string.IsNullOrEmpty(path))
+        {
+            throw new ArgumentException(
+                "That looks like a page URL (it has " + path + " after the address). " +
+                "In Shop server URL enter ONLY the site address — e.g. https://copysahaayak.vercel.app");
+        }
+
         return uri.ToString().TrimEnd('/');
     }
 
@@ -203,15 +214,19 @@ public sealed class ApiClient : IDisposable
         using var response = await _http.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new ApiException(response.StatusCode, ExtractServerMessage(body));
+            throw new ApiException(response.StatusCode, FriendlyErrorMessage(response.StatusCode, ExtractServerMessage(body)));
         try
         {
             return JsonSerializer.Deserialize<TResponse>(body, JsonOptions)
                    ?? throw new InvalidOperationException("Unexpected empty response from the server.");
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            throw new InvalidOperationException($"Unexpected response from the server: {ex.Message}", ex);
+            // A 2xx response that is not JSON is almost always a wrong URL serving
+            // an HTML page — give the shop a clear pointer instead of a parse error.
+            throw new InvalidOperationException(
+                "The server answered but not with the expected service response. " +
+                "Check the Shop server URL — use ONLY the site address, e.g. https://copysahaayak.vercel.app");
         }
     }
 
@@ -220,12 +235,43 @@ public sealed class ApiClient : IDisposable
         using var response = await _http.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new ApiException(response.StatusCode, ExtractServerMessage(body));
+            throw new ApiException(response.StatusCode, FriendlyErrorMessage(response.StatusCode, ExtractServerMessage(body)));
+    }
+
+    /// <summary>
+    /// Server-sent JSON message when present; otherwise a clear, actionable
+    /// message for the status code. Raw HTML error pages are never surfaced.
+    /// </summary>
+    private static string FriendlyErrorMessage(HttpStatusCode status, string? serverMessage)
+    {
+        if (!string.IsNullOrWhiteSpace(serverMessage)) return serverMessage;
+        return status switch
+        {
+            HttpStatusCode.NotFound =>
+                "The server has no such service (404). Check the Shop server URL — enter ONLY the site address " +
+                "(e.g. https://copysahaayak.vercel.app), not a page URL like …/s/shop-name.",
+            HttpStatusCode.Unauthorized => "The pairing code is invalid or expired (401). Generate a fresh code in the dashboard.",
+            HttpStatusCode.Forbidden => "Access denied (403) — the shop may be suspended or the code belongs to another shop.",
+            HttpStatusCode.Gone => "This pairing code is no longer valid (410). Generate a fresh code in the dashboard.",
+            HttpStatusCode.BadRequest => "The request was rejected (400) — check the pairing code (6 characters).",
+            HttpStatusCode.TooManyRequests => "Too many attempts — wait a minute and try again.",
+            HttpStatusCode.RequestTimeout => "The server took too long to answer (408) — try again in a moment.",
+            HttpStatusCode.InternalServerError => "Server error (500) — try again in a moment; if it repeats, contact support.",
+            HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout =>
+                "The server is temporarily unavailable (" + (int)status + ") — try again in a couple of minutes.",
+            _ => $"The server rejected the request ({(int)status}).",
+        };
     }
 
     private static string? ExtractServerMessage(string body)
     {
         if (string.IsNullOrWhiteSpace(body)) return null;
+
+        // HTML error pages (wrong URL, proxy errors, …) are never shown raw — the
+        // caller substitutes a friendly, status-specific message instead.
+        var trimmed = body.TrimStart();
+        if (trimmed.StartsWith('<')) return null;
+
         try
         {
             using var doc = JsonDocument.Parse(body);
@@ -234,16 +280,21 @@ public sealed class ApiClient : IDisposable
                 if (doc.RootElement.TryGetProperty(key, out var element) &&
                     element.ValueKind == JsonValueKind.String)
                 {
-                    return element.GetString();
+                    var text = element.GetString();
+                    if (!string.IsNullOrWhiteSpace(text)) return text;
                 }
             }
         }
         catch (JsonException)
         {
-            // Not JSON — fall through to raw body.
+            // Not JSON — fall through to a truncated plain-text body.
         }
 
-        return body.Length > 300 ? body[..300] + "…" : body;
+        // Strip anything that looks like markup before showing a plain body.
+        var plain = trimmed.StartsWith('{') || trimmed.StartsWith('[')
+            ? body
+            : System.Text.RegularExpressions.Regex.Replace(body, "<[^>]+>", " ").Trim();
+        return plain.Length > 200 ? plain[..200] + "…" : plain;
     }
 
     private static string SanitizeFileName(string name)
