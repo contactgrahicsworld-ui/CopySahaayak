@@ -578,6 +578,17 @@ function PrintersTab() {
     load()
   }
 
+  async function removeDevice(id: string) {
+    const res = await fetch(`/api/admin/devices/${id}?purge=1`, { method: 'DELETE' })
+    const data = await res.json()
+    if (!res.ok) {
+      toast({ title: 'Failed', description: data.error, variant: 'destructive' })
+      return
+    }
+    toast({ title: 'Device removed from the list' })
+    load()
+  }
+
   async function updatePrinter(id: string, patch: Record<string, unknown>) {
     const res = await fetch('/api/admin/printers', {
       method: 'PATCH',
@@ -625,6 +636,9 @@ function PrintersTab() {
                   <Badge variant={d.status === 'ACTIVE' ? 'default' : d.status === 'PENDING' ? 'secondary' : 'destructive'}>{d.status}</Badge>
                   {d.status !== 'REVOKED' && (
                     <Button size="sm" variant="destructive" onClick={() => revokeDevice(d.id)}>Revoke</Button>
+                  )}
+                  {(d.status === 'REVOKED' || d.status === 'PENDING') && (
+                    <Button size="sm" variant="outline" onClick={() => removeDevice(d.id)}>Remove</Button>
                   )}
                 </div>
               </div>
