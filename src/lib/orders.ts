@@ -310,8 +310,12 @@ export async function recordPrintEvent(jobId: string, status: 'SPOOLING' | 'COMP
   if (job.status === 'COMPLETED') return // idempotent
   if (job.status === 'CANCELLED') throw new HttpError(409, 'Job was cancelled')
 
-  if (status === 'COMPLETED' && job.status !== 'SPOOLING') {
-    // Honesty rule: connector may only report COMPLETED after it actually spooled the job
+  if (status === 'COMPLETED' && job.status !== 'SPOOLING' && job.status !== 'CLAIMED') {
+    // Honesty rule: only the device that holds the claim may report COMPLETED
+    // (checked above), and only after it actually took the job. CLAIMED is
+    // accepted too: if the best-effort SPOOLING event was lost to a network
+    // hiccup, a hard 409 here would make the job permanently un-completable —
+    // it would be re-queued and printed twice.
     throw new HttpError(409, 'COMPLETED requires a SPOOLING event first (spooler verification)')
   }
 

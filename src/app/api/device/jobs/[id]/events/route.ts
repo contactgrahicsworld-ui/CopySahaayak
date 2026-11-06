@@ -1,7 +1,9 @@
 // Print job lifecycle events from the connector.
 // SPOOLING → job physically handed to the Windows spooler.
-// COMPLETED → spooler confirmed the job finished. Enforced: COMPLETED without a
-// prior SPOOLING event is rejected (no fake "printed" states).
+// COMPLETED → spooler confirmed the job finished. Enforced: only the device
+// holding the claim may report COMPLETED, and never from a QUEUED/never-claimed
+// job (no fake "printed" states). CLAIMED is accepted so a lost SPOOLING event
+// cannot make a job permanently un-completable.
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { authenticateDevice } from '@/lib/auth'
