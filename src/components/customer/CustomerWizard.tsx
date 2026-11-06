@@ -451,30 +451,37 @@ function PayStage({
     <main className="min-h-screen bg-muted/30">
       <div className="container max-w-lg mx-auto px-4 py-6 space-y-4">
         <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="h-4 w-4 mr-1" aria-hidden /> Edit order
+          <ArrowLeft className="h-4 w-4 mr-1" aria-hidden /> Edit order / बदलें
         </Button>
         <Card>
           <CardContent className="pt-6 pb-6 text-center space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Order {order.orderNumber}</p>
-              <p className="text-3xl font-bold flex items-center justify-center">
-                <IndianRupee className="h-7 w-7" aria-hidden />{(order.totalPaise / 100).toFixed(2)}
+              <p className="text-4xl font-bold flex items-center justify-center">
+                <IndianRupee className="h-8 w-8" aria-hidden />{(order.totalPaise / 100).toFixed(2)}
               </p>
             </div>
             {order.qrDataUrl && (
-              <div className="mx-auto bg-white p-2 rounded-xl w-fit border">
-                <img src={order.qrDataUrl} alt={`UPI QR code to pay ₹${(order.totalPaise / 100).toFixed(2)} to ${order.upi.payeeName}`} className="h-44 w-44 sm:h-56 sm:w-56" />
+              <div className="mx-auto bg-white p-3 rounded-xl w-fit border shadow-sm">
+                <img src={order.qrDataUrl} alt={`UPI QR code to pay ₹${(order.totalPaise / 100).toFixed(2)} to ${order.upi.payeeName}`} className="h-56 w-56 sm:h-64 sm:w-64" />
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              Payment goes directly to <strong className="text-foreground">{shop.name}</strong> ({order.upi.payeeName})
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Scan with any UPI app (GPay, PhonePe, Paytm, BHIM) — the amount is pre-filled.
-              Paying from the same phone? Tap the button below to open your UPI app directly.
-            </p>
+            <ol className="text-left space-y-2 max-w-xs mx-auto" aria-label="Payment steps">
+              <li className="flex gap-2.5 text-sm">
+                <span className="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs">1</span>
+                <span>QR को GPay / PhonePe / Paytm से <strong>स्कैन करें</strong><span className="block text-xs text-muted-foreground">Scan the QR with any UPI app — amount is pre-filled</span></span>
+              </li>
+              <li className="flex gap-2.5 text-sm">
+                <span className="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs">2</span>
+                <span>पूरी रकम भेज दें — पैसा सीधा दुकान के खाते में जाएगा<span className="block text-xs text-muted-foreground">Pay the exact amount — it goes directly to {shop.name} ({order.upi.payeeName})</span></span>
+              </li>
+              <li className="flex gap-2.5 text-sm">
+                <span className="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs">3</span>
+                <span>नीचे UTR नंबर डालकर बटन दबाएं<span className="block text-xs text-muted-foreground">Enter the UTR below and press the button</span></span>
+              </li>
+            </ol>
             <a href={order.upi.payload} className="block">
-              <Button variant="outline" className="w-full">Open UPI app to pay</Button>
+              <Button variant="outline" className="w-full h-11">इसी फ़ोन से भुगतान करें — Open UPI app</Button>
             </a>
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <span className="font-mono text-foreground">{order.upi.vpa}</span>
@@ -494,17 +501,18 @@ function PayStage({
             </div>
             <Separator />
             <div className="text-left space-y-1.5">
-              <Label htmlFor="utr" className="text-sm font-medium">Enter UPI reference / UTR number</Label>
+              <Label htmlFor="utr" className="text-sm font-medium">UTR नंबर (UPI का रेफ़रेंस नंबर)</Label>
               <Input
                 id="utr"
                 value={utr}
                 onChange={(e) => setUtr(e.target.value.toUpperCase())}
-                placeholder="e.g. 402512345678"
+                placeholder="जैसे: 402512345678"
                 inputMode="numeric"
                 autoComplete="off"
               />
               <p className="text-xs text-muted-foreground">
-                Find it in your UPI app → payment history → transaction details. The shop verifies it before printing.
+                UPI app खोलें → बतियाँ / <strong>History</strong> → दी गई payment → <strong>UTR / UPI Ref No</strong> कॉपी करके यहाँ डालें। दुकान उसी से भुगतान जाँचेगी।
+                <span className="block mt-0.5">Find it in your UPI app → History → tap the payment → copy the UTR / reference number.</span>
               </p>
               <Button
                 variant="ghost"
@@ -520,9 +528,9 @@ function PayStage({
                 <Copy className="h-3 w-3 mr-1" aria-hidden /> Copy order number
               </Button>
             </div>
-            <Button className="w-full" size="lg" onClick={onSubmit} disabled={submitting}>
+            <Button className="w-full h-12 text-base" size="lg" onClick={onSubmit} disabled={submitting}>
               {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4 mr-2" aria-hidden />}
-              I have paid — submit reference
+              मैंने भुगतान कर दिया — I have paid
             </Button>
           </CardContent>
         </Card>

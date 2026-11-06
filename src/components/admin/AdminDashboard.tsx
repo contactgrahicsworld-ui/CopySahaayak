@@ -1214,9 +1214,10 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
       <Dialog open={!!payPlan} onOpenChange={(v) => !v && setPayPlan(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Pay for {payPlan?.name} — ₹{payPlan ? (payPlan.pricePaise / 100).toFixed(0) : ''}</DialogTitle>
+            <DialogTitle>{payPlan?.name} plan — ₹{payPlan ? (payPlan.pricePaise / 100).toFixed(0) : ''} का भुगतान</DialogTitle>
             <DialogDescription>
-              This payment goes directly to the platform admin&apos;s UPI. Scan the QR with any UPI app (GPay / PhonePe / Paytm), then enter the UTR below. The platform admin verifies it before your plan activates.
+              तीन आसान कदम: 1) QR स्कैन करें 2) रकम भेजें 3) नीचे UTR डालें। पैसा सीधे platform admin के UPI में जाएगा — जाँच के बाद plan चालू होगा।
+              <br /><span className="text-xs">Scan the QR with any UPI app (GPay / PhonePe / Paytm), then enter the UTR below. The platform admin verifies it before your plan activates.</span>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -1226,9 +1227,9 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
             {payQr && (
               <div className="flex flex-col items-center gap-2 rounded-lg border bg-white p-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={payQr.dataUrl} alt={`Scan to pay ₹${(payQr.amountPaise / 100).toFixed(0)} to ${payQr.vpa}`} className="h-44 w-44" />
+                <img src={payQr.dataUrl} alt={`Scan to pay ₹${(payQr.amountPaise / 100).toFixed(0)} to ${payQr.vpa}`} className="h-52 w-52" />
                 <p className="text-xs text-muted-foreground text-center">
-                  Paying <strong className="text-foreground">{payQr.payee}</strong> · {payQr.vpa}
+                  भुगतान होगा: <strong className="text-foreground">{payQr.payee}</strong> · <span className="font-mono">{payQr.vpa}</span>
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   <Button size="sm" asChild>
@@ -1243,14 +1244,14 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
               </div>
             )}
             {!payQr && !payQrErr && (
-              <div className="h-44 w-44 mx-auto rounded-lg border bg-muted animate-pulse" aria-hidden />
+              <div className="h-52 w-52 mx-auto rounded-lg border bg-muted animate-pulse" aria-hidden />
             )}
-            <div className="space-y-1"><Label>UTR / reference</Label><Input value={utr} onChange={(e) => setUtr(e.target.value.toUpperCase())} placeholder="12-digit number from your UPI app" /></div>
+            <div className="space-y-1"><Label>UTR नंबर (UPI app के History में मिलेगा)</Label><Input value={utr} onChange={(e) => setUtr(e.target.value.toUpperCase())} placeholder="जैसे: 402512345678" inputMode="numeric" /></div>
             <div className="space-y-1"><Label>Payer name (optional)</Label><Input value={payerName} onChange={(e) => setPayerName(e.target.value)} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayPlan(null)}>Cancel</Button>
-            <Button onClick={submitSubPayment}>Submit for verification</Button>
+            <Button onClick={submitSubPayment}>भुगतान हो गया — Submit for verification</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

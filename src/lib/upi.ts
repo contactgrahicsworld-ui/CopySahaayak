@@ -13,15 +13,23 @@ export interface UpiParams {
 
 export function buildUpiPayload(p: UpiParams): string {
   const rupees = (p.amountPaise / 100).toFixed(2)
-  const params = new URLSearchParams({
-    pa: p.vpa,
-    pn: p.payeeName.slice(0, 50),
-    am: rupees,
-    tr: p.txnRef.replace(/[^a-zA-Z0-9]/g, '').slice(0, 35),
-    tn: p.note.slice(0, 50),
-    cu: 'INR',
-  })
-  return `upi://pay?${params.toString()}`
+  // Real UPI apps are picky about encoding:
+  //  - the payee VPA's "@" must stay literal — most apps (PhonePe, Paytm, bank
+  //    apps) do NOT decode "%40" and show "invalid UPI ID";
+  //  - spaces must be "%20" — the "application/x-www-form-urlencoded" "+"
+  //    renders literally as "Manish+Mukherjee" in the app's payee screen.
+  // encodeURIComponent emits %20 for spaces but %40 for @, so @ is restored.
+  // Everything dangerous (&, =, #, +) stays percent-encoded.
+  const enc = (v: string) => encodeURIComponent(v).replace(/%40/gi, '@')
+  const params = [
+    `pa=${enc(p.vpa)}`,
+    `pn=${enc(p.payeeName.slice(0, 50))}`,
+    `am=${rupees}`,
+    `tr=${p.txnRef.replace(/[^a-zA-Z0-9]/g, '').slice(0, 35)}`,
+    `tn=${enc(p.note.slice(0, 50))}`,
+    'cu=INR',
+  ]
+  return `upi://pay?${params.join('&')}`
 }
 
 export async function generateUpiQr(shop: Pick<Shop, 'upiVpa' | 'upiPayeeName' | 'name'>, amountPaise: number, txnRef: string) {
