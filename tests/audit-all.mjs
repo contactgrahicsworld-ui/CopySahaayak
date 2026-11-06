@@ -1,7 +1,7 @@
 // CopySahaayak — exhaustive 1-1 function audit (API surface of every UI button).
 // Run against the LIVE deployment with REAL credentials:
 //   BASE_URL=https://copysahaayak.vercel.app \
-//   E2E_SUPER_EMAIL=super@copysahaayak.app E2E_SUPER_PASSWORD='...' \
+//   E2E_SUPER_EMAIL=<super admin email> E2E_SUPER_PASSWORD='<password>' \
 //   E2E_OWNER_EMAIL=contact.grahicsworld@gmail.com E2E_OWNER_PASSWORD='...' \
 //   bun tests/audit-all.mjs
 //
@@ -111,8 +111,8 @@ async function main() {
   // ================================================= [2] Auth & sessions
   console.log('[2] Authentication')
   {
-    const bad = await req('/api/auth/login', { method: 'POST', body: { email: 'super@copysahaayak.app', password: 'wrong-password' } })
-    check('wrong password → 401', bad.res.status === 401, `got ${bad.res.status}`)
+    const bad = await req('/api/auth/login', { method: 'POST', body: { email: 'nobody.probe@invalid.test', password: 'wrong-password' } })
+    check('unknown/wrong credentials → 401', bad.res.status === 401, `got ${bad.res.status}`)
 
     const s = await req('/api/auth/login', { method: 'POST', body: { email: process.env.E2E_SUPER_EMAIL, password: process.env.E2E_SUPER_PASSWORD } })
     check('super admin login', s.res.status === 200 && s.data.user?.role === 'SUPER_ADMIN', JSON.stringify(s.data))

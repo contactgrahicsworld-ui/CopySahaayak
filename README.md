@@ -13,14 +13,16 @@ bun run db:push && bun prisma/seed.ts
 bun run dev        # http://localhost:3000
 ```
 
-## Demo accounts (seeded)
+## Accounts
 
 | Role | URL | Credentials |
 | --- | --- | --- |
-| Shop Admin (Sharma Digital) | `/admin` | `owner@sharmadigitalpress.in` / `Shop@12345` |
-| Shop Admin (Ganesh Copy) | `/admin` | `ganesh@ganeshcopy.in` / `Shop@12345` |
-| Super Admin | `/super` | `super@copysahaayak.in` / `Super@12345` |
-| Customer | `/s/sharma-digital` | no account needed |
+| Super Admin (platform owner) | `/super` | **No default.** Created once via first-run `/setup` — the setup page locks permanently afterwards. |
+| Shop Admin | `/admin` | Shop owner creates their own account at `/register`. |
+| Customer | `/s/{slug}` | no account needed |
+
+The repo and the deployed app ship with **zero predefined or hardcoded credentials**.
+`prisma/seed.ts` creates only platform settings + plans — never users.
 
 ## Surfaces
 

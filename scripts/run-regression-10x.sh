@@ -7,8 +7,9 @@ set -a; source .env 2>/dev/null; set +a
 unset DATABASE_URL DIRECT_URL
 BASE_URL="${BASE_URL:-https://copysahaayak.vercel.app}"
 export BASE_URL
-export E2E_SUPER_EMAIL="super@copysahaayak.app"
-export E2E_SUPER_PASSWORD="Cs-Platform-2026!Vn7qZ"
+# Credentials come from the environment — never stored in this repo.
+: "${E2E_SUPER_EMAIL:?set E2E_SUPER_EMAIL first}" 
+: "${E2E_SUPER_PASSWORD:?set E2E_SUPER_PASSWORD first}"
 
 START=${1:-1}
 END=${2:-10}

@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +24,15 @@ function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [setupPending, setSetupPending] = useState(false)
+
+  useEffect(() => {
+    // Show the one-time platform setup link only while no SUPER_ADMIN exists.
+    fetch('/api/setup')
+      .then((r) => r.json())
+      .then((d) => setSetupPending(Boolean(d?.data && d.data.setupDone === false)))
+      .catch(() => {})
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -72,6 +81,12 @@ function LoginForm() {
             Customer? You don&apos;t need an account — just scan the shop QR or open the shop link.
           </p>
           <p className="text-xs text-center mt-2">
+            {setupPending && (
+              <>
+                <Link href="/setup" className="underline font-medium">First-time platform setup</Link>
+                {' · '}
+              </>
+            )}
             <Link href="/forgot-password" className="underline">Forgot password?</Link>
             {' · '}
             <Link href="/register" className="underline">New shop? Create account</Link>

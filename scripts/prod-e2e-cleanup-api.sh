@@ -7,9 +7,12 @@ BASE="${BASE_URL:-https://copysahaayak.vercel.app}"
 JAR="${JAR:-/tmp/jar-super.txt}"
 
 login() {
+  # Credentials come from the environment — never stored in this repo.
+  : "${E2E_SUPER_EMAIL:?set E2E_SUPER_EMAIL first}"
+  : "${E2E_SUPER_PASSWORD:?set E2E_SUPER_PASSWORD first}"
   curl -sS --max-time 30 -c "$JAR" -X POST "$BASE/api/auth/login" \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"${E2E_SUPER_EMAIL:-super@copysahaayak.app}\",\"password\":\"${E2E_SUPER_PASSWORD:-Cs-Platform-2026!Vn7qZ}\"}" > /dev/null
+    -d "{\"email\":\"${E2E_SUPER_EMAIL}\",\"password\":\"${E2E_SUPER_PASSWORD}\"}" > /dev/null
 }
 
 # Reuse a valid session; only spend a login attempt when the jar is stale.
