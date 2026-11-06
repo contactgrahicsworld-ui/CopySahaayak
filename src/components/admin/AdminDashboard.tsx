@@ -600,6 +600,16 @@ function PrintersTab() {
     else load()
   }
 
+  async function removePrinter(id: string) {
+    const res = await fetch(`/api/admin/printers?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const data = await res.json()
+    if (!res.ok) toast({ title: 'Failed', description: data.error, variant: 'destructive' })
+    else {
+      toast({ title: 'Printer removed from the list' })
+      load()
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -679,6 +689,7 @@ function PrintersTab() {
                   <Button size="sm" variant={p.isDefault ? 'default' : 'outline'} onClick={() => updatePrinter(p.id, { isDefault: true })}>
                     {p.isDefault ? 'Default' : 'Set default'}
                   </Button>
+                  <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => removePrinter(p.id)}>Remove</Button>
                 </div>
               </div>
             ))

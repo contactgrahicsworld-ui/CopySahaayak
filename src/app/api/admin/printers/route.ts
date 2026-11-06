@@ -58,3 +58,35 @@ export async function PATCH(req: Request) {
     return jsonOk({ ok: true })
   })
 }
+
+// Remove a stale/orphaned printer row from the list (e.g. left behind by a
+// revoked connector or a renamed Windows printer). The connector re-registers
+// it on the next heartbeat if it is still mapped in Printer Settings.
+export async function DELETE(req: Request) {
+  return handleRoute(req, {}, async () => {
+    const ctx = await requireAnyShopAdmin()
+    const id = new URL(req.url).searchParams.get('id') ?? ''
+    const printer = await db.printer.findFirst({ where: { id, shopId: ctx.user.shopId } })
+    if (!printer) return jsonError(404, 'Printer not found')
+
+    await db.$transaction(async (tx) => {
+      // Release queued jobs that were targeted at this printer
+      await tx.printJob.updateMany({
+        where: { printerId: printer.id, status: { in: ['QUEUED', 'CLAIMED', 'SPOOLING'] } },
+        data: { printerId: null },
+      })
+      await tx.printer.delete({ where: { id: printer.id } })
+    })
+    await audit({
+      shopId: ctx.user.shopId,
+      userId: ctx.user.id,
+      actorType: 'USER',
+      action: 'PRINTER_REMOVED',
+      entity: 'Printer',
+      entityId: printer.id,
+      meta: { windowsName: printer.windowsName },
+      ip: getClientIp(req),
+    })
+    return jsonOk({ ok: true })
+  })
+}
