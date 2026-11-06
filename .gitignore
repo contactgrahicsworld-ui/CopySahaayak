@@ -79,3 +79,5 @@ tool-results/
 .dbpass
 download/
 private-data/
+.vercel-token
+.audit-credentials.json

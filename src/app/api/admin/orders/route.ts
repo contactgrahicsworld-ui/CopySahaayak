@@ -1,7 +1,7 @@
 // Shop order list with filters. Tenant-scoped: only this shop's orders.
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk } from '@/lib/api'
-import { requireAnyShopAdmin } from '@/lib/auth'
+import { requireAnyShopAdmin, HttpError } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +12,9 @@ export async function GET(req: Request) {
     const url = new URL(req.url)
     const status = url.searchParams.get('status')
     const q = url.searchParams.get('q')?.trim()
-    const take = Math.min(Number(url.searchParams.get('take') || 60), 200)
+    const takeRaw = Number(url.searchParams.get('take') ?? '60')
+    if (!Number.isFinite(takeRaw) || takeRaw < 1) throw new HttpError(400, 'take must be a positive number')
+    const take = Math.min(Math.floor(takeRaw), 200)
 
     const orders = await db.order.findMany({
       where: {

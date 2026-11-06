@@ -6,7 +6,7 @@
 import ExcelJS from 'exceljs'
 import { db } from '@/lib/db'
 import { handleRoute } from '@/lib/api'
-import { requireAnyShopAdmin } from '@/lib/auth'
+import { HttpError, requireAnyShopAdmin } from '@/lib/auth'
 import { bucketKey, parseBucket, type Bucket } from '@/lib/reports'
 
 export const dynamic = 'force-dynamic'
@@ -18,8 +18,14 @@ export async function GET(req: Request) {
     const ctx = await requireAnyShopAdmin()
     const shopId = ctx.user.shopId
     const url = new URL(req.url)
-    const days = Math.min(Math.max(Number(url.searchParams.get('days') || 30), 7), 365)
-    const bucket: Bucket = parseBucket(url.searchParams.get('groupBy'))
+    const daysRaw = Number(url.searchParams.get('days') ?? '30')
+    if (!Number.isFinite(daysRaw) || daysRaw < 7 || daysRaw > 365)
+      throw new HttpError(400, 'days must be a number between 7 and 365')
+    const days = Math.floor(daysRaw)
+    const groupRaw = url.searchParams.get('groupBy')
+    if (groupRaw !== null && groupRaw !== '' && groupRaw !== 'day' && groupRaw !== 'week' && groupRaw !== 'month')
+      throw new HttpError(400, 'groupBy must be one of: day, week, month')
+    const bucket: Bucket = parseBucket(groupRaw)
     const since = new Date(Date.now() - days * 86400000)
 
     const shop = await db.shop.findUnique({ where: { id: shopId }, select: { name: true, slug: true } })
