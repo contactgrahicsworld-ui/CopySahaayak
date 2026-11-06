@@ -987,6 +987,8 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
   // Scan-to-pay QR for plan payments — always points to the PLATFORM (super admin) UPI.
   const [payQr, setPayQr] = useState<{ dataUrl: string; payload: string; vpa: string; payee: string; amountPaise: number } | null>(null)
   const [payQrErr, setPayQrErr] = useState('')
+  const [downgradeOpen, setDowngradeOpen] = useState(false)
+  const [downgrading, setDowngrading] = useState(false)
 
   useEffect(() => {
     if (!payPlan) { setPayQr(null); setPayQrErr(''); return }
@@ -1081,6 +1083,22 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
     toast({ title: 'Submitted — platform admin will verify and activate' })
     setPayPlan(null)
     setUtr('')
+  }
+
+  async function downgradeToFree() {
+    setDowngrading(true)
+    try {
+      const res = await fetch('/api/admin/subscription/downgrade', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Downgrade failed')
+      toast({ title: 'Moved to the Free plan', description: 'Free plan limits now apply. You can upgrade again anytime.' })
+      setDowngradeOpen(false)
+      fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then(setSub)
+    } catch (err) {
+      toast({ title: 'Downgrade failed', description: err instanceof Error ? err.message : '', variant: 'destructive' })
+    } finally {
+      setDowngrading(false)
+    }
   }
 
   return (
@@ -1182,6 +1200,14 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
               </Card>
             ))}
           </div>
+          {sub?.subscription?.plan && sub.subscription.plan.pricePaise > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-md border px-3 py-2">
+              <p className="text-sm text-muted-foreground flex-1">
+                Don&apos;t need paid features right now? Move this shop back to the <strong className="text-foreground">Free plan</strong> — Free limits apply immediately, payment history is kept and you can upgrade again anytime.
+              </p>
+              <Button size="sm" variant="outline" className="shrink-0" onClick={() => setDowngradeOpen(true)}>Downgrade to Free</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1225,6 +1251,23 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayPlan(null)}>Cancel</Button>
             <Button onClick={submitSubPayment}>Submit for verification</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={downgradeOpen} onOpenChange={setDowngradeOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Move to the Free plan?</DialogTitle>
+            <DialogDescription>
+              Your {sub?.subscription?.plan?.name} plan ends immediately and Free plan limits apply (orders per month, devices). Your payment history is kept and you can upgrade again anytime.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDowngradeOpen(false)}>Cancel</Button>
+            <Button variant="destructive" disabled={downgrading} onClick={downgradeToFree}>
+              {downgrading && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Move to Free plan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

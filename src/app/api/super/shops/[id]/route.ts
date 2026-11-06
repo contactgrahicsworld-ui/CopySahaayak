@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const patchSchema = z.object({
-  action: z.enum(['ACTIVATE', 'SUSPEND', 'RESET_PASSWORD', 'REVOKE_ALL_DEVICES']),
+  action: z.enum(['ACTIVATE', 'SUSPEND', 'RESET_PASSWORD', 'REVOKE_ALL_DEVICES', 'RESET_PLAN_FREE']),
   reason: z.string().trim().max(300).optional(),
   newPassword: z.string().min(8).max(100).optional(),
 })
@@ -52,6 +52,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         await db.device.updateMany({ where: { shopId: id, status: { in: ['ACTIVE', 'PENDING'] } }, data: { status: 'REVOKED', tokenHash: null, pairingCode: null } })
         await db.printer.updateMany({ where: { shopId: id }, data: { status: 'OFFLINE', deviceId: null } })
         break
+      case 'RESET_PLAN_FREE': {
+        // Platform control: force a shop back to the Free plan (mirrors the owner
+        // self-service downgrade). Pending payments are intentionally left in the
+        // verification queue — the admin can reject them from the Verifications tab.
+        const freePlan = await db.plan.findUnique({ where: { code: 'FREE' } })
+        if (!freePlan) return jsonError(500, 'Free plan is not configured')
+        const now = new Date()
+        const freeExpiry = new Date(now.getTime() + freePlan.durationDays * 86400_000)
+        await db.subscription.upsert({
+          where: { shopId: id },
+          create: { shopId: id, planId: freePlan.id, status: 'ACTIVE', startsAt: now, expiresAt: freeExpiry },
+          update: { planId: freePlan.id, status: 'ACTIVE', startsAt: now, expiresAt: freeExpiry },
+        })
+        await db.notification.create({
+          data: {
+            audience: 'SHOP',
+            shopId: id,
+            title: 'Your plan was changed to Free',
+            body: 'The platform admin moved your shop to the Free plan. Free plan limits now apply; you can upgrade again anytime.',
+          },
+        })
+        break
+      }
     }
     await audit({
       shopId: id,
