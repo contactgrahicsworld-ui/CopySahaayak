@@ -626,7 +626,7 @@ function PrintersTab() {
           ) : devices.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               No connector paired yet. Click “Pair connector”, then enter the code in the Windows app
-              (download from the <a href="/download" className="underline">connector page</a>).
+              (download it from the <a href="/#download" className="underline">home page</a>).
             </p>
           ) : (
             devices.map((d) => (
