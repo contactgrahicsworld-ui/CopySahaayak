@@ -1,3 +1,4 @@
+using System.Net;
 using PrintSahayakConnector.Api;
 using PrintSahayakConnector.Printing;
 
@@ -209,19 +210,18 @@ public sealed class JobWorker : IDisposable
             }
             catch (DeviceRevokedException)
             {
-                SetStatus(WorkerState.Revoked, "Revoked by the shop admin — pair again to reconnect.");
-                NotifyUser?.Invoke(
-                    "This device was revoked by the shop admin. Use “Pair with Shop…” to reconnect.",
-                    BalloonKind.Error);
-                Logger.Warn("Device revoked — parking the worker loop.");
-                try
-                {
-                    await Task.Delay(Timeout.Infinite, ct);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
+                await ParkRevokedAsync(ct);
+                break;
+            }
+            catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized && !_disposed)
+            {
+                // The device token no longer exists on the server — the device was
+                // revoked or removed in the dashboard, so every call answers 401
+                // "Device not authenticated". Retrying forever would only spam the
+                // logs (401 every 15 s … 5 min); park the loop and ask for a re-pair.
+                Logger.Warn($"Device token was rejected ({Shorten(ex.Message)}) — treating the device as revoked.");
+                await ParkRevokedAsync(ct);
+                break;
             }
             catch (Exception ex)
             {
@@ -247,6 +247,28 @@ public sealed class JobWorker : IDisposable
 
         SetStatus(WorkerState.Stopped, "Stopped");
         Logger.Info("Worker loop stopped.");
+    }
+
+    /// <summary>
+    /// Parks the worker loop after the device was revoked or removed: stops all
+    /// server calls, surfaces a clear status and asks for a re-pair. Pairing again
+    /// restarts the loop with a fresh token via <see cref="RestartWith"/>.
+    /// </summary>
+    private async Task ParkRevokedAsync(CancellationToken ct)
+    {
+        SetStatus(WorkerState.Revoked, "Revoked or removed by the shop admin — pair again to reconnect.");
+        NotifyUser?.Invoke(
+            "This device was revoked or removed by the shop admin. Use “Pair with Shop…” to reconnect.",
+            BalloonKind.Error);
+        Logger.Warn("Device revoked or removed — parking the worker loop until re-pairing.");
+        try
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown or re-pair — this loop exits and a fresh one starts.
+        }
     }
 
     private async Task SendHeartbeatAsync(ApiClient api, CancellationToken ct)
