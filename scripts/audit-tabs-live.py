@@ -79,10 +79,76 @@ check("owner has >=1 ACTIVE device", len(real_devices) >= 1, devs0)
 s, prs0, _ = req(owner, "GET", "/api/admin/printers")
 check("GET /api/admin/printers 200 list", s == 200 and isinstance(prs0.get("printers"), list), (s, prs0))
 printers = prs0.get("printers", [])
-check("owner has >=1 printer", len(printers) >= 1, prs0)
+if printers:
+    print("INFO  shop has real printers; temp-device lifecycle will run anyway for coverage")
 orig_default = next((p for p in printers if p.get("isDefault")), None)
 probe = printers[0] if printers else None
 orig_color = probe.get("colorMode") if probe else None
+
+# ---------- TEMP DEVICE LIFECYCLE: full Printers-tab button coverage ----------
+# Creates a paired device + 2 AUDIT printers, exercises PATCH buttons, then
+# removes printers, revokes + purges the device. Zero residue by construction.
+print("\n---- TEMP DEVICE LIFECYCLE (Printers tab full coverage) ----")
+s, td, _ = req(owner, "POST", "/api/admin/devices", {})
+temp_code = td.get("device", {}).get("pairingCode", "")
+temp_dev_id = td.get("device", {}).get("id", "")
+check("temp: pairing code issued", s == 200 and len(temp_code) == 6, (s, td))
+anon, _ = opener_with_jar()
+s, tp, _ = req(anon, "POST", "/api/device/pair",
+               {"pairingCode": temp_code, "machineName": "AUDIT TabAudit PC", "appVersion": "audit"})
+check("temp: device paired, token issued", s == 200 and bool(tp.get("deviceToken")), (s, str(tp)[:120]))
+token = tp.get("deviceToken", "")
+s, thb, _ = req(anon, "POST", "/api/device/heartbeat",
+                {"appVersion": "audit", "printers": [
+                    {"windowsName": "AUDIT Printer A", "colorMode": "BW", "paperSizes": ["A4", "A5"]},
+                    {"windowsName": "AUDIT Printer B", "colorMode": "COLOR", "paperSizes": ["A4"]}]},
+                {"Authorization": f"Bearer {token}"})
+check("temp: heartbeat registers 2 printers", s == 200 and thb.get("ok") is True, (s, thb))
+s, prsT, _ = req(owner, "GET", "/api/admin/printers")
+audit_printers = {p["windowsName"]: p for p in prsT.get("printers", []) if p["windowsName"].startswith("AUDIT")}
+check("temp: 2 AUDIT printers visible in dashboard list", len(audit_printers) == 2, prsT)
+pa = audit_printers.get("AUDIT Printer A", {})
+pb = audit_printers.get("AUDIT Printer B", {})
+if pa:
+    s, d6, _ = req(owner, "PATCH", "/api/admin/printers", {"id": pa["id"], "colorMode": "ANY"})
+    check("temp: PATCH colorMode 200", s == 200, (s, d6))
+    s, prsC, _ = req(owner, "GET", "/api/admin/printers")
+    gotC = next((p for p in prsC.get("printers", []) if p["id"] == pa["id"]), {})
+    check("temp: colorMode persisted ANY", gotC.get("colorMode") == "ANY", gotC.get("colorMode"))
+    s, d8, _ = req(owner, "PATCH", "/api/admin/printers", {"id": pa["id"], "colorMode": "BOGUS"})
+    check("temp: invalid colorMode rejected 400", s == 400, (s, d8))
+if pa and pb:
+    s, d9, _ = req(owner, "PATCH", "/api/admin/printers", {"id": pa["id"], "isDefault": True})
+    check("temp: set-default 200", s == 200, (s, d9))
+    s, prsD, _ = req(owner, "GET", "/api/admin/printers")
+    defaults = [p["id"] for p in prsD.get("printers", []) if p.get("isDefault")]
+    check("temp: exactly one default after set", defaults == [pa["id"]], defaults)
+    s, d10, _ = req(owner, "PATCH", "/api/admin/printers", {"id": pb["id"], "isDefault": True})
+    check("temp: re-point default to other printer 200", s == 200, (s, d10))
+    s, prsD2, _ = req(owner, "GET", "/api/admin/printers")
+    defaults2 = [p["id"] for p in prsD2.get("printers", []) if p.get("isDefault")]
+    check("temp: default moved exactly once", defaults2 == [pb["id"]], defaults2)
+    orig_default = pb  # restore to AUDIT-B's successor; real default is absent today (user removed printers)
+# cleanup: remove AUDIT printers
+for nm, p in (("AUDIT Printer A", pa), ("AUDIT Printer B", pb)):
+    if p.get("id"):
+        s, d11, _ = req(owner, "DELETE", f"/api/admin/printers?id={p['id']}")
+        check(f"temp: DELETE printer {nm} 200", s == 200, (s, d11))
+s, prsZ, _ = req(owner, "GET", "/api/admin/printers")
+left = [p for p in prsZ.get("printers", []) if p["windowsName"].startswith("AUDIT")]
+check("temp: AUDIT printers fully removed", len(left) == 0, prsZ)
+# revoke then purge temp device (ACTIVE purge must be blocked)
+if temp_dev_id and token:
+    s, dR, _ = req(owner, "DELETE", f"/api/admin/devices/{temp_dev_id}")
+    check("temp: revoke device 200", s == 200, (s, dR))
+    s, dHB, _ = req(anon, "POST", "/api/device/heartbeat",
+                    {"appVersion": "audit", "printers": []}, {"Authorization": f"Bearer {token}"})
+    check("temp: revoked token rejected 401", s == 401, (s, dHB))
+    s, dP, _ = req(owner, "DELETE", f"/api/admin/devices/{temp_dev_id}?purge=1")
+    check("temp: purge REVOKED device 200", s == 200, (s, dP))
+    s, devsZ, _ = req(owner, "GET", "/api/admin/devices")
+    idsZ = [x["id"] for x in devsZ.get("devices", [])]
+    check("temp: device fully purged from list", temp_dev_id not in idsZ, idsZ)
 
 # ================= PRINTERS TAB =================
 print("\n---- PRINTERS TAB ----")
@@ -95,13 +161,10 @@ check("deepLink present + correct scheme",
       str(d.get("deepLink", "")).startswith(("printsahayak://pair?", "photocopyconnector://pair?")), d.get("deepLink"))
 check("pairing expiry present", bool(pair_dev.get("expiresAt")), pair_dev)
 
-# pairing code must actually be live on the device pair endpoint (unauthenticated)
+# pairing endpoint must reject a well-formed but WRONG code (unauthenticated)
 s, d2, _ = req(opener_with_jar()[0], "POST", "/api/device/pair",
-               {"code": pair_dev.get("pairingCode"), "machineName": "AUDIT-NONPAIR", "appVersion": "audit"})
-# NOTE: we intentionally pair nothing — invalid shape test should NOT consume the code.
-# Actually the body IS a valid shape; to avoid consuming the code we instead test with a WRONG code.
-check("pair endpoint rejects wrong code (sanity, unauthenticated 401/404/410)",
-      s in (400, 401, 404, 410), (s, d2))
+               {"pairingCode": "ZZZZZZ", "machineName": "AUDIT-NONPAIR", "appVersion": "audit"})
+check("pair endpoint rejects wrong code 401/404 (code not found)", s in (401, 404), (s, d2))
 
 # Revoke + Remove lifecycle on the PENDING device we just created
 if pair_dev.get("id"):
@@ -117,29 +180,6 @@ else:
 if real_devices:
     s, d5, _ = req(owner, "DELETE", f"/api/admin/devices/{real_devices[0]['id']}?purge=1")
     check("purge ACTIVE device correctly blocked 400", s == 400, (s, d5))
-
-# printer colorMode dropdown
-if probe:
-    s, d6, _ = req(owner, "PATCH", "/api/admin/printers", {"id": probe["id"], "colorMode": "ANY"})
-    check("PATCH printers colorMode 200", s == 200, (s, d6))
-    s, prs1, _ = req(owner, "GET", "/api/admin/printers")
-    got = next((p for p in prs1.get("printers", []) if p["id"] == probe["id"]), {})
-    check("colorMode persisted as ANY", got.get("colorMode") == "ANY", got.get("colorMode"))
-    s, d7, _ = req(owner, "PATCH", "/api/admin/printers", {"id": probe["id"], "colorMode": orig_color or "BW"})
-    check("PATCH printers colorMode restored", s == 200, (s, d7))
-    s, d8, _ = req(owner, "PATCH", "/api/admin/printers", {"id": probe["id"], "colorMode": "BOGUS"})
-    check("PATCH printers invalid colorMode rejected 400", s == 400, (s, d8))
-
-# set-default button
-if len(printers) >= 2 and orig_default:
-    other = next(p for p in printers if p["id"] != orig_default["id"])
-    s, d9, _ = req(owner, "PATCH", "/api/admin/printers", {"id": other["id"], "isDefault": True})
-    check("PATCH printers set-default 200", s == 200, (s, d9))
-    s, prs2, _ = req(owner, "GET", "/api/admin/printers")
-    defaults = [p["id"] for p in prs2.get("printers", []) if p.get("isDefault")]
-    check("exactly one default after switch", defaults == [other["id"]], defaults)
-    s, d10, _ = req(owner, "PATCH", "/api/admin/printers", {"id": orig_default["id"], "isDefault": True})
-    check("default restored to original printer", s == 200, (s, d10))
 
 # printer remove: negative path only (never delete real printers)
 s, d11, _ = req(owner, "DELETE", "/api/admin/printers?id=nonexistent-id-xyz")

@@ -153,7 +153,7 @@ async function main() {
 
   // ---------- 5. Customer order flow ----------
   console.log('[5] Customer order flow (guest session → upload → order → UPI → UTR)')
-  let orderNumber, documentId, fileUrl
+  let orderNumber, order2Number, documentId, fileUrl
   {
     const jarCustomer = new Jar()
     const s2 = await req(`/api/shops/${SHOP_A.slug}/session`, { method: 'POST', body: { name: 'Test Customer', phone: '9820011223' }, jar: jarCustomer })
@@ -223,6 +223,18 @@ async function main() {
     const track2 = await fetch(`${BASE}/api/shops/${SHOP_A.slug}/orders/${orderNumber}?phone=9820011223`)
     const t2 = await track2.json()
     check('customer tracks own order (AWAITING_VERIFICATION)', t2?.status === 'AWAITING_VERIFICATION', `got ${t2?.status}`)
+
+    // Second order (same document, 1 copy) → drives the classic SPOOLING→COMPLETED path
+    // in section 7 while order 1 exercises the lost-SPOOLING recovery path.
+    const ord2 = await req(`/api/shops/${SHOP_A.slug}/orders`, {
+      method: 'POST',
+      jar: jarCustomer,
+      body: { customerName: 'Test Customer', customerPhone: '9820011223', items: [{ documentId, colorMode: 'BW', paperSize: 'A4', duplex: false, copies: 1 }] },
+    })
+    check('second order created (₹6.00 = 600 paise)', ord2.res.status === 200 && ord2.data?.totalPaise === 600, JSON.stringify(ord2.data))
+    order2Number = ord2.data?.orderNumber
+    const utr2 = await req(`/api/shops/${SHOP_A.slug}/orders/${order2Number}/utr`, { method: 'POST', jar: jarCustomer, body: { utr: `UTR2${Date.now()}`.slice(0, 22), payerName: 'Test Customer' } })
+    check('second UTR submission accepted', utr2.res.status === 200, JSON.stringify(utr2.data))
   }
 
   // ---------- 6. Cross-tenant isolation (attacks) ----------
@@ -298,19 +310,48 @@ async function main() {
       const dl = await fetch(`${BASE}${job.document.downloadUrl}`)
       check('device can download the document', dl.status === 200)
 
-      // Honesty rule: COMPLETED before SPOOLING must be rejected
-      const fake = await req(`/api/device/jobs/${job.id}/events`, { method: 'POST', headers: devH, body: { status: 'COMPLETED' } })
-      check('COMPLETED without SPOOLING rejected 409 (no fake printing)', fake.res.status === 409, `got ${fake.res.status}`)
-
-      const spool = await req(`/api/device/jobs/${job.id}/events`, { method: 'POST', headers: devH, body: { status: 'SPOOLING' } })
-      check('SPOOLING accepted', spool.res.status === 200)
-      const done = await req(`/api/device/jobs/${job.id}/events`, { method: 'POST', headers: devH, body: { status: 'COMPLETED' } })
-      check('COMPLETED after spooling accepted', done.res.status === 200)
-
-      const track2 = await fetch(`${BASE}/api/shops/${SHOP_A.slug}/orders/${orderNumber}?phone=9820011223`)
-      const t2 = await track2.json()
-      check('order auto-completed after all jobs printed', t2?.status === 'COMPLETED', `got ${t2?.status}`)
+      // Lost-SPOOLING recovery: COMPLETED straight from CLAIMED is accepted (if the
+      // best-effort SPOOLING event was lost, a 409 would requeue and print twice).
+      const recover = await req(`/api/device/jobs/${job.id}/events`, { method: 'POST', headers: devH, body: { status: 'COMPLETED' } })
+      check('COMPLETED from CLAIMED accepted (lost-SPOOLING recovery)', recover.res.status === 200, `got ${recover.res.status}`)
+      const again = await req(`/api/device/jobs/${job.id}/events`, { method: 'POST', headers: devH, body: { status: 'COMPLETED' } })
+      check('duplicate COMPLETED is idempotent 200', again.res.status === 200, `got ${again.res.status}`)
     }
+
+    const tA = await fetch(`${BASE}/api/shops/${SHOP_A.slug}/orders/${orderNumber}?phone=9820011223`)
+    const tAdata = await tA.json()
+    check('order 1 auto-completed (recovery path)', tAdata?.status === 'COMPLETED', `got ${tAdata?.status}`)
+
+    // Second payment → second job QUEUED (unclaimed)
+    const payA2 = await req('/api/admin/payments?status=SUBMITTED', { jar: jarA })
+    const paymentA2 = payA2.data?.payments?.find((p) => p.order.orderNumber === order2Number)
+    check('shop A sees second submitted payment', !!paymentA2 && paymentA2.order.orderNumber === order2Number)
+    const verify2 = await req(`/api/admin/payments/${paymentA2.id}`, { method: 'POST', jar: jarA, body: { action: 'VERIFY', note: 'e2e verified 2' } })
+    check('second payment verified', verify2.res.status === 200, JSON.stringify(verify2.data))
+
+    // Honesty rule: a device may never report COMPLETED on a job it has not claimed.
+    const listA = await req('/api/admin/orders', { jar: jarA })
+    const orderA2 = listA.data?.orders?.find((o) => o.orderNumber === order2Number)
+    const detailA2 = await req(`/api/admin/orders/${orderA2.id}`, { jar: jarA })
+    const queuedJobId = detailA2.data?.order?.items?.[0]?.printJobs?.[0]?.id
+    check('second job is queued and visible to shop A', !!queuedJobId, JSON.stringify(detailA2.data).slice(0, 200))
+    const fakeDone = await req(`/api/device/jobs/${queuedJobId}/events`, { method: 'POST', headers: devH, body: { status: 'COMPLETED' } })
+    check('COMPLETED on unclaimed job rejected 403 (no fake printing)', fakeDone.res.status === 403, `got ${fakeDone.res.status}`)
+
+    // Classic path on the second job: claim → SPOOLING → COMPLETED
+    const claim2 = await req('/api/device/jobs/claim', { method: 'POST', headers: devH, body: {} })
+    check('device claims the second job', claim2.res.status === 200 && claim2.data?.job?.id, JSON.stringify(claim2.data))
+    const job2 = claim2.data?.job
+    if (job2) {
+      const spool2 = await req(`/api/device/jobs/${job2.id}/events`, { method: 'POST', headers: devH, body: { status: 'SPOOLING' } })
+      check('SPOOLING accepted', spool2.res.status === 200, `got ${spool2.res.status}`)
+      const done2 = await req(`/api/device/jobs/${job2.id}/events`, { method: 'POST', headers: devH, body: { status: 'COMPLETED' } })
+      check('COMPLETED after spooling accepted', done2.res.status === 200, `got ${done2.res.status}`)
+    }
+
+    const t3 = await fetch(`${BASE}/api/shops/${SHOP_A.slug}/orders/${order2Number}?phone=9820011223`)
+    const t3data = await t3.json()
+    check('order 2 auto-completed after all jobs printed', t3data?.status === 'COMPLETED', `got ${t3data?.status}`)
   }
 
   // ---------- 8. Device revocation ----------
