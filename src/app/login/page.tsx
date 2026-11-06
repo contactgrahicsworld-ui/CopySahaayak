@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,6 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const router = useRouter()
   const params = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -47,9 +46,10 @@ function LoginForm() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Login failed')
       const next = params.get('next')
-      if (next && next.startsWith('/')) router.push(next)
-      else router.push(data.user.role === 'SUPER_ADMIN' ? '/super' : '/admin')
-      router.refresh()
+      // Hard navigation instead of router.push: guarantees the fresh session
+      // cookie is used by server components on every browser, and can never
+      // silently race (a stuck disabled button with no navigation).
+      window.location.assign(next && next.startsWith('/') ? next : data.user.role === 'SUPER_ADMIN' ? '/super' : '/admin')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Login failed')
       setLoading(false)

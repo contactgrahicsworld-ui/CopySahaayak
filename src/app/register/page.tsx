@@ -2,7 +2,6 @@
 
 // Shop self-registration: creates the shop + owner account and signs in.
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -16,7 +15,6 @@ function slugify(v: string): string {
 }
 
 export default function RegisterPage() {
-  const router = useRouter()
   const [ownerName, setOwnerName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -51,8 +49,9 @@ export default function RegisterPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
       toast.success(`Welcome! Your shop page: /s/${data.shopSlug}`)
-      router.push('/admin')
-      router.refresh()
+      // Hard navigation: the just-created session cookie must be picked up by
+      // the dashboard server component — client-router push can silently race.
+      window.location.assign('/admin')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Registration failed')
       setLoading(false)
