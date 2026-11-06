@@ -81,3 +81,7 @@ download/
 private-data/
 .vercel-token
 .audit-credentials.json
+connector/**/bin/
+connector/**/obj/
+connector/publish/
+download/connector/
