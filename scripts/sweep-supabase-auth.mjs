@@ -1,5 +1,5 @@
-// Sweep Supabase auth: delete every user except the two real shop owners.
-// Repeats until no deletable users remain (handles pagination shifts).
+// Sweep Supabase auth: delete every user except the real platform accounts
+// (super admin + shop owners). Repeats until no deletable users remain.
 import { readFileSync } from 'fs'
 const envText = readFileSync('/home/z/my-project/.env', 'utf8')
 const get = (k) => {
@@ -8,7 +8,11 @@ const get = (k) => {
 }
 const SUPA = get('SUPABASE_URL')
 const KEY = get('SUPABASE_SERVICE_ROLE_KEY')
-const KEEP = new Set(['cscrjn85@gmail.com', 'contact.grahicsworld@gmail.com'])
+const KEEP = new Set([
+  'vedpackagingindustries@gmail.com', // super admin (current)
+  'contact.grahicsworld@gmail.com',   // shop owner (mansa)
+  'cscrjn85@gmail.com',               // shop owner (second shop)
+])
 
 let totalDeleted = 0, rounds = 0
 while (rounds < 10) {
