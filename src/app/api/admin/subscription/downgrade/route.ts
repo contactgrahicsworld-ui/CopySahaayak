@@ -18,8 +18,9 @@ export async function POST(req: Request) {
       include: { plan: true },
     })
     if (!sub) return jsonError(404, 'No subscription found')
-    if (sub.plan.code === 'FREE') return jsonError(400, 'You are already on the Free plan')
 
+    // Pending-payment check FIRST: a shop still on the FREE plan that has just
+    // submitted its first UTR must be told to wait (409), not "already on Free".
     const pending = await db.subscriptionPayment.findFirst({
       where: { shopId: ctx.user.shopId, status: 'PENDING' },
     })
@@ -29,6 +30,8 @@ export async function POST(req: Request) {
         'You have a payment awaiting verification. Wait for the platform admin to verify or reject it first.'
       )
     }
+
+    if (sub.plan.code === 'FREE') return jsonError(400, 'You are already on the Free plan')
 
     const freePlan = await db.plan.findUnique({ where: { code: 'FREE' } })
     if (!freePlan) return jsonError(500, 'Free plan is not configured')
