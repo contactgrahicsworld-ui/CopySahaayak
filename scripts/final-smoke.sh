@@ -15,7 +15,7 @@ echo "== SHOP OWNER LOGIN + APIs =="
 rm -f "$JAR"
 CODE=$(curl -s -o /tmp/login-final.json -w "%{http_code}" --max-time 30 -c "$JAR" -X POST "$B/api/auth/login" -H "Content-Type: application/json" -d '{"email":"contact.grahicsworld@gmail.com","password":"Cs-Shop-2026-Secure!x"}')
 ck "owner login" "$CODE" "200"
-for EP in "/api/admin/orders" "/api/admin/subscription" "/api/admin/devices" "/api/admin/reports/summary" "/api/admin/pricing" "/api/admin/shop"; do
+for EP in "/api/admin/orders" "/api/admin/subscription" "/api/admin/devices" "/api/admin/reports" "/api/admin/pricing" "/api/admin/shop"; do
   CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 -b "$JAR" "$B$EP")
   ck "owner API $EP" "$CODE" "200"
 done
