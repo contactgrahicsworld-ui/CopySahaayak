@@ -14,6 +14,13 @@ export async function POST(req: Request) {
     if (!device) return jsonError(401, 'Device not authenticated')
 
     const job = await db.$transaction(async (tx) => {
+      // Release jobs whose claim lease expired (device crash / network loss
+      // mid-print) — without this sweep a CLAIMED job would be stuck forever
+      // because the query below only looks at QUEUED.
+      await tx.printJob.updateMany({
+        where: { shopId: device.shopId, status: 'CLAIMED', leaseUntil: { lt: new Date() } },
+        data: { status: 'QUEUED', claimedByDeviceId: null, claimedAt: null, leaseUntil: null, deviceId: null },
+      })
       // Prefer jobs targeted at printers of this device, then any QUEUED for the shop
       const candidates = await tx.printJob.findMany({
         where: { shopId: device.shopId, status: 'QUEUED', OR: [{ leaseUntil: null }, { leaseUntil: { lt: new Date() } }] },
