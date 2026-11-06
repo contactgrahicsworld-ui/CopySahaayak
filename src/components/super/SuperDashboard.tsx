@@ -12,17 +12,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
+import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, Store, BadgeCheck, Layers, ScrollText, Settings, LogOut, Loader2,
-  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2,
+  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2, AtSign,
 } from 'lucide-react'
 
 export function SuperDashboard({ user }: { user: { name: string; email: string } }) {
   const router = useRouter()
   const [tab, setTab] = useState('overview')
   const [pwOpen, setPwOpen] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [selfEmail, setSelfEmail] = useState(user.email)
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -36,9 +39,12 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
         <div className="container mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2">
           <div className="min-w-0">
             <p className="font-semibold text-sm truncate">CopySahaayak Platform</p>
-            <p className="text-[11px] text-muted-foreground truncate">{user.email} · Super Admin</p>
+            <p className="text-[11px] text-muted-foreground truncate">{selfEmail} · Super Admin</p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => setEmailOpen(true)} aria-label="Change login email">
+              <AtSign className="h-4 w-4 sm:mr-1" aria-hidden /> <span className="hidden sm:inline">Email</span>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setPwOpen(true)} aria-label="Change password">
               <KeyRound className="h-4 w-4 sm:mr-1" aria-hidden /> <span className="hidden sm:inline">Password</span>
             </Button>
@@ -66,11 +72,12 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
           <TabsContent value="subs"><SubsTab /></TabsContent>
           <TabsContent value="plans"><PlansTab /></TabsContent>
           <TabsContent value="audit"><AuditTab /></TabsContent>
-          <TabsContent value="settings"><PlatformSettingsTab /></TabsContent>
+          <TabsContent value="settings"><div className="space-y-4"><PlatformSettingsTab /><PlatformOwnershipCard /></div></TabsContent>
         </Tabs>
       </div>
 
       <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
+      <ChangeEmailDialog open={emailOpen} onOpenChange={setEmailOpen} currentEmail={selfEmail} onDone={setSelfEmail} />
     </main>
   )
 }
@@ -820,5 +827,101 @@ function PlatformSettingsTab() {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+// Platform ownership handover — password-confirmed self-deactivation. This is
+// the ONLY supported way the platform-owner identity moves: the current super
+// admin is deactivated, every session is signed out, and the one-time /setup
+// page re-opens so a completely fresh platform admin creates their own login
+// and UPI. Shops and their data are untouched. (API: PATCH /api/super/users.)
+function PlatformOwnershipCard() {
+  const { toast } = useToast()
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [confirmText, setConfirmText] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit() {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/super/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Handover failed')
+      setOpen(false)
+      toast({ title: 'Platform ownership released', description: 'The one-time setup page is open again — the new platform admin creates their own account at /setup.' })
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+      router.push('/login')
+      router.refresh()
+    } catch (err) {
+      toast({ title: 'Handover failed', description: err instanceof Error ? err.message : 'Try again', variant: 'destructive' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <Card className="max-w-xl border-destructive/40">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldOff className="h-4 w-4 text-destructive" aria-hidden /> Transfer platform ownership
+          </CardTitle>
+          <CardDescription>
+            Handing the platform to someone else? This deactivates the current super admin, signs out everywhere, and re-opens the
+            one-time setup page so the new owner creates their own credentials and UPI. Shops and their business data are not touched.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="destructive" size="sm" onClick={() => setOpen(true)}>Transfer ownership…</Button>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!busy) {
+            setOpen(v)
+            if (!v) {
+              setPassword('')
+              setConfirmText('')
+            }
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldOff className="h-4 w-4 text-destructive" aria-hidden /> Confirm platform transfer
+            </DialogTitle>
+            <DialogDescription>
+              Your super admin account is deactivated immediately and first-time setup re-opens. Type TRANSFER and enter the current
+              password to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="ho-confirm">Type TRANSFER to confirm</Label>
+              <Input id="ho-confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="TRANSFER" autoComplete="off" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="ho-password">Current password</Label>
+              <Input id="ho-password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+            <Button variant="destructive" onClick={submit} disabled={busy || confirmText.trim() !== 'TRANSFER' || !password}>
+              {busy && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Deactivate me &amp; re-open setup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

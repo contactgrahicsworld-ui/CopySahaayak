@@ -14,12 +14,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
+import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, ClipboardList, BadgeCheck, Printer, IndianRupee, BarChart3, Settings, LogOut,
   RefreshCw, FileText, Plus, QrCode, Loader2, Check, X, Store, KeyRound, MessageCircle, Download,
-  TriangleAlert,
+  TriangleAlert, AtSign,
 } from 'lucide-react'
 
 // wa.me deep link: works on every phone/WhatsApp Web with no API approval needed.
@@ -51,6 +52,8 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
   const router = useRouter()
   const [tab, setTab] = useState('overview')
   const [pwOpen, setPwOpen] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [selfEmail, setSelfEmail] = useState(user.email)
   // White-label: the shop's own name is the app name everywhere (tab title too).
   useEffect(() => { document.title = `${shop.name} — Dashboard` }, [shop.name])
   // Plan expiry watch: warn from 7 days before the subscription ends.
@@ -79,10 +82,13 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
             <Store className="h-5 w-5 shrink-0" aria-hidden />
             <div className="min-w-0">
               <p className="font-semibold text-sm truncate">{shop.name}</p>
-              <p className="text-[11px] text-muted-foreground truncate">{user.email} · /s/{shop.slug}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{selfEmail} · /s/{shop.slug}</p>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => setEmailOpen(true)} aria-label="Change login email">
+              <AtSign className="h-4 w-4 sm:mr-1" aria-hidden /> <span className="hidden sm:inline">Email</span>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setPwOpen(true)} aria-label="Change password">
               <KeyRound className="h-4 w-4 sm:mr-1" aria-hidden /> <span className="hidden sm:inline">Password</span>
             </Button>
@@ -133,6 +139,7 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
       </footer>
 
       <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
+      <ChangeEmailDialog open={emailOpen} onOpenChange={setEmailOpen} currentEmail={selfEmail} onDone={setSelfEmail} />
     </main>
   )
 }

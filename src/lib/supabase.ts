@@ -95,6 +95,12 @@ export async function adminUpdateUserPassword(supabaseId: string, password: stri
   return res.status === 200
 }
 
+/** Removes a mirror auth user (used when a login email changes). Best effort. */
+export async function adminDeleteUser(supabaseId: string): Promise<boolean> {
+  const res = await sbFetch(`/auth/v1/admin/users/${supabaseId}`, { method: 'DELETE' })
+  return res.status === 200
+}
+
 // ============ EMAIL OTP (built-in free-tier mailer, anon key) ============
 
 export interface OtpSendResult {

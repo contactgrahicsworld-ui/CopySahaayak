@@ -176,3 +176,10 @@ export const resetPasswordSchema = z.object({
   code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code from your email'),
   password: newPasswordSchema,
 })
+
+// Self-service login-email change (super + shop admin): the CURRENT password
+// proves ownership, the new email is validated like every other email input.
+export const changeEmailSchema = z.object({
+  currentPassword: z.string().min(1).max(100),
+  newEmail: z.string().trim().email().max(120),
+})
