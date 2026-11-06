@@ -215,9 +215,14 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
             <p className="text-xs text-muted-foreground mt-0.5">{[shop.address, shop.phone].filter(Boolean).join(' · ')}</p>
           )}
           <ol className="mt-2.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-            {['Upload files', 'Choose size & copies', 'Pay by UPI', 'Shop prints'].map((s, i) => (
-              <li key={s} className="rounded-full bg-muted px-2 py-0.5 whitespace-nowrap">
-                <span className="font-semibold text-foreground">{i + 1}</span> · {s}
+            {[
+              { hi: 'फ़ाइल भेजें', en: 'Upload' },
+              { hi: 'साइज़ चुनें', en: 'Choose' },
+              { hi: 'भुगतान करें', en: 'Pay' },
+              { hi: 'दुकान प्रिंट करेगी', en: 'Shop prints' },
+            ].map((s, i) => (
+              <li key={s.en} className="rounded-full bg-muted px-2 py-0.5 whitespace-nowrap">
+                <span className="font-semibold text-foreground">{i + 1}</span> · {s.hi} <span className="hidden min-[400px]:inline">/ {s.en}</span>
               </li>
             ))}
           </ol>
@@ -247,8 +252,9 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
               ) : (
                 <FileUp className="h-8 w-8 text-muted-foreground" aria-hidden />
               )}
-              <span className="font-medium">{uploading ? 'Uploading & counting pages…' : 'Tap to upload PDF or images'}</span>
-              <span className="text-xs text-muted-foreground">PDF, JPG, PNG · up to 25 MB · pages counted automatically</span>
+              <span className="font-bold text-base sm:text-lg">{uploading ? 'अपलोड हो रहा है… / Uploading…' : 'फ़ाइल चुनें — PDF या फोटो'}</span>
+              <span className="text-sm text-muted-foreground">{uploading ? 'Pages counted automatically' : 'यहाँ दबाएँ / Tap here to upload'}</span>
+              <span className="text-xs text-muted-foreground">PDF, JPG, PNG · 25 MB तक / up to 25 MB · पन्ने अपने-आप गिने जाएँगे</span>
             </button>
           </CardContent>
         </Card>
@@ -282,7 +288,7 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
                 <Separator />
 
                 <div>
-                  <Label className="text-xs text-muted-foreground">Colour</Label>
+                  <Label className="text-xs text-muted-foreground">रंग / Colour</Label>
                   <div className="grid grid-cols-2 gap-2 mt-1">
                     {(['BW', 'COLOR'] as ColorMode[]).map((cm) => (
                       <button
@@ -290,18 +296,19 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
                         type="button"
                         disabled={!ruleExists(cm, item.paperSize)}
                         onClick={() => patchItem(item.key, { colorMode: cm })}
-                        className={`rounded-lg border px-3 py-2.5 text-sm font-medium disabled:opacity-40 ${
+                        className={`rounded-lg border px-3 py-3 text-sm font-semibold disabled:opacity-40 ${
                           item.colorMode === cm ? 'border-primary bg-primary text-primary-foreground' : 'bg-background'
                         }`}
                       >
-                        {cm === 'BW' ? 'Black & White' : 'Colour'}
+                        {cm === 'BW' ? 'काला-सफ़ेद' : 'रंगीन'}
+                        <span className="block text-[10px] font-normal opacity-80">{cm === 'BW' ? 'Black & White' : 'Colour'}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-xs text-muted-foreground">Paper size</Label>
+                  <Label className="text-xs text-muted-foreground">कागज़ का साइज़ / Paper size</Label>
                   <div className="grid grid-cols-4 gap-1.5 mt-1">
                     {SIZES.map((ps) => (
                       <button
@@ -320,7 +327,7 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs text-muted-foreground">Copies</Label>
+                  <Label className="text-xs text-muted-foreground">कॉपियाँ / Copies</Label>
                   <div className="flex items-center gap-3">
                     <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Decrease copies" onClick={() => patchItem(item.key, { copies: Math.max(1, item.copies - 1) })}>−</Button>
                     <span className="w-10 text-center font-semibold">{item.copies}</span>
@@ -330,19 +337,19 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-xs text-muted-foreground">Print both sides (duplex)</Label>
-                    <p className="text-[11px] text-muted-foreground">Cheaper per page where the shop offers it</p>
+                    <Label className="text-xs text-muted-foreground">दोनों तरफ़ प्रिंट / Both sides</Label>
+                    <p className="text-[11px] text-muted-foreground">सस्ता पड़ता है / Cheaper per page</p>
                   </div>
                   <Switch checked={item.duplex} onCheckedChange={(v) => patchItem(item.key, { duplex: v })} aria-label="Double-sided printing" />
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground">Pages</Label>
+                    <Label className="text-xs text-muted-foreground">पन्ने / Pages</Label>
                     <div className="flex items-center gap-2 text-sm">
-                      <span>All {item.pageCount}</span>
+                      <span>सभी / All {item.pageCount}</span>
                       <Switch checked={!item.rangeAll} onCheckedChange={(v) => patchItem(item.key, { rangeAll: !v })} aria-label="Custom page range" />
-                      <span>Range</span>
+                      <span>चुनकर / Range</span>
                     </div>
                   </div>
                   {!item.rangeAll && (
@@ -383,7 +390,8 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
         {items.length > 0 && (
           <Card>
             <CardContent className="pt-4 space-y-3">
-              <p className="text-sm font-medium">Your details (optional — helps the shop reach you)</p>
+              <p className="text-sm font-medium">आपका नाम और फ़ोन (ऑप्शनल) / Your details (optional)</p>
+              <p className="text-[11px] text-muted-foreground -mt-2">दुकान ज़रूरत पड़ने पर आपको फ़ोन कर सके</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label htmlFor="cname" className="text-xs">Name</Label>
@@ -405,7 +413,7 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
         <div className="fixed bottom-0 inset-x-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-safe">
           <div className="container max-w-lg mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] leading-tight text-muted-foreground">Total ({items.length} file{items.length > 1 ? 's' : ''})</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">कुल / Total ({items.length} फ़ाइल{items.length > 1 ? 'ें' : ''})</p>
               <p className="text-lg sm:text-xl font-bold flex items-center">
                 <IndianRupee className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden />
                 {(total / 100).toFixed(2)}
@@ -413,8 +421,8 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
             </div>
             <Button size="lg" className="shrink-0 px-3 sm:px-6 text-sm sm:text-base" onClick={placeOrder} disabled={placing || missingRules}>
               {placing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" aria-hidden /> : <Printer className="h-4 w-4 mr-1.5" aria-hidden />}
-              <span className="hidden min-[380px]:inline">Place order & pay</span>
-              <span className="min-[380px]:hidden">Order & pay</span>
+              <span className="hidden min-[380px]:inline">ऑर्डर दें — भुगतान करें / Place order & pay</span>
+              <span className="min-[380px]:hidden">ऑर्डर दें / Order & pay</span>
             </Button>
           </div>
         </div>
@@ -546,13 +554,15 @@ function DoneStage({ slug, orderNumber }: { slug: string; orderNumber: string })
         <CardContent className="pt-8 pb-8 space-y-4">
           <CheckCircle2 className="h-12 w-12 mx-auto text-green-600" aria-hidden />
           <div>
-            <p className="font-bold text-lg">Reference submitted</p>
+            <p className="font-bold text-lg">भेज दिया गया — रेफ़रेंस जमा हो गया</p>
+            <p className="text-xs text-muted-foreground mb-1">Reference submitted</p>
             <p className="text-sm text-muted-foreground">
-              Order <strong>{orderNumber}</strong> is awaiting payment verification by the shop. Track live status here.
+              ऑर्डर <strong>{orderNumber}</strong> — दुकान भुगतान जाँच कर प्रिंट शुरू करेगी। नीचे बटन दबाकर स्थिति देखें।
+              <span className="block mt-0.5">Track live status here — the shop verifies payment, then prints.</span>
             </p>
           </div>
-          <Button asChild className="w-full">
-            <a href={`/s/${slug}/order/${orderNumber}`}>Track order</a>
+          <Button asChild className="w-full h-12 text-base">
+            <a href={`/s/${slug}/order/${orderNumber}`}>ऑर्डर देखें / Track order</a>
           </Button>
           <Badge variant="outline" className="mx-auto">
             <Clock className="h-3 w-3 mr-1" aria-hidden /> Save this link to check anytime

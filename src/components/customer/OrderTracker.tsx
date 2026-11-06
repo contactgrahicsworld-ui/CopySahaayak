@@ -67,8 +67,9 @@ export function OrderTracker({ slug, shopName, orderNumber }: { slug: string; sh
       <main className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
         <Card className="max-w-sm w-full">
           <CardContent className="pt-6 space-y-3 text-center">
-            <p className="font-medium">This order is linked to another device.</p>
-            <p className="text-sm text-muted-foreground">Enter the phone number used while ordering to verify:</p>
+            <p className="font-medium">यह ऑर्डर किसी दूसरे फ़ोन से बनाया गया था।</p>
+            <p className="text-sm text-muted-foreground">ऑर्डर करते समय जो फ़ोन नंबर डाला था, वह नीचे लिखें:</p>
+            <p className="text-xs text-muted-foreground -mt-2">This order is linked to another device — enter the phone number used while ordering:</p>
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -106,20 +107,20 @@ export function OrderTracker({ slug, shopName, orderNumber }: { slug: string; sh
     <main className="min-h-screen bg-muted/30">
       <div className="container max-w-lg mx-auto px-4 py-6 space-y-4">
         <div>
-          <p className="text-sm text-muted-foreground">{shopName}</p>
-          <h1 className="text-xl font-bold">Order {order.orderNumber}</h1>
+          <p className="text-sm text-muted-foreground">{shopName} · दुकान</p>
+          <h1 className="text-xl font-bold">ऑर्डर / Order {order.orderNumber}</h1>
         </div>
 
         <Card>
           <CardContent className="pt-4 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Status</span>
+              <span className="text-sm font-medium">स्थिति / Status</span>
               {rejected ? (
-                <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" aria-hidden /> {order.status}</Badge>
+                <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" aria-hidden /> रद्द / {order.status}</Badge>
               ) : order.status === 'COMPLETED' ? (
-                <Badge className="gap-1 bg-green-600"><CheckCircle2 className="h-3 w-3" aria-hidden /> Printed & ready</Badge>
+                <Badge className="gap-1 bg-green-600"><CheckCircle2 className="h-3 w-3" aria-hidden /> छप गया — ले जाएँ / Ready</Badge>
               ) : (
-                <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3 animate-pulse" aria-hidden /> In progress</Badge>
+                <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3 animate-pulse" aria-hidden /> काम चल रहा है / In progress</Badge>
               )}
             </div>
 
@@ -129,7 +130,7 @@ export function OrderTracker({ slug, shopName, orderNumber }: { slug: string; sh
                   <div key={s} className="flex-1 flex flex-col items-center gap-1">
                     <div className={`h-1.5 w-full rounded-full ${i <= stepIdx ? 'bg-primary' : 'bg-muted'}`} />
                     <span className={`text-[10px] ${i <= stepIdx ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                      {['Placed', 'Verifying', 'Printing', 'Ready'][i]}
+                      {['लगाया / Placed', 'जाँच / Verifying', 'छपाई / Printing', 'तैयार / Ready'][i]}
                     </span>
                   </div>
                 ))}
@@ -137,7 +138,7 @@ export function OrderTracker({ slug, shopName, orderNumber }: { slug: string; sh
             )}
 
             {order.payment?.status === 'REJECTED' && order.payment.rejectionReason && (
-              <p className="text-sm text-red-600">Payment rejected: {order.payment.rejectionReason}. Please contact the shop.</p>
+              <p className="text-sm text-red-600">भुगतान नामंज़ूर: {order.payment.rejectionReason} — कृपया दुकान से संपर्क करें।</p>
             )}
             <Separator />
             {order.items.map((item) => (
@@ -153,19 +154,19 @@ export function OrderTracker({ slug, shopName, orderNumber }: { slug: string; sh
                   <p className="text-xs flex items-center gap-1 text-muted-foreground">
                     <Printer className="h-3 w-3" aria-hidden />
                     {item.printJobs.every((j) => j.status === 'COMPLETED')
-                      ? 'Sent to printer — completed'
+                      ? 'प्रिंटर को भेजा गया — पूरा हुआ / Completed'
                       : item.printJobs.some((j) => j.status === 'SPOOLING')
-                        ? 'Printing now…'
+                        ? 'अभी छप रहा है / Printing now…'
                         : item.printJobs.some((j) => j.status === 'FAILED')
-                          ? 'Printer reported an issue — shop is retrying'
-                          : 'Queued for printing'}
+                          ? 'प्रिंटर में दिक्कत — दुकान फिर कोशिश कर रही है'
+                          : 'प्रिंट के लिए क़तार में / Queued'}
                   </p>
                 )}
               </div>
             ))}
             <Separator />
             <div className="flex justify-between font-semibold">
-              <span>Total</span>
+              <span>कुल / Total</span>
               <span className="flex items-center"><IndianRupee className="h-4 w-4" aria-hidden />{(order.totalPaise / 100).toFixed(2)}</span>
             </div>
           </CardContent>
@@ -185,7 +186,7 @@ export function OrderTracker({ slug, shopName, orderNumber }: { slug: string; sh
           </Button>
         </div>
 
-        <p className="text-xs text-muted-foreground text-center">This page refreshes automatically every 8 seconds.</p>
+        <p className="text-xs text-muted-foreground text-center">यह पन्ना हर 8 सेकंड में अपने-आप अपडेट होता है / Auto-refreshes every 8 s</p>
       </div>
     </main>
   )
