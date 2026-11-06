@@ -129,6 +129,36 @@ public sealed class ApiClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// GET /api/downloads/connector/version — public endpoint (no device token needed)
+    /// telling this app whether a newer build exists. Returns null on any failure or
+    /// unusable answer; an update check must never surface an error to the shop.
+    /// </summary>
+    public async Task<UpdateInfo?> GetLatestVersionAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "api/downloads/connector/version");
+            using var response = await _http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode) return null;
+            var body = await response.Content.ReadAsStringAsync(ct);
+            var info = JsonSerializer.Deserialize<UpdateInfo>(body, JsonOptions);
+            // A relative downloadUrl is resolved against this connector's own server
+            // so self-hosted deployments keep working unchanged.
+            if (info?.DownloadUrl is { } url && url.StartsWith('/'))
+            {
+                info = info with { DownloadUrl = ServerUrl + url };
+            }
+
+            return info;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+        {
+            Logger.Debug($"Update check skipped: {ex.Message}");
+            return null;
+        }
+    }
+
     /// <summary>GET /api/device/me — pairing state, shop and server-side printer list.</summary>
     public Task<MeResponse> GetMeAsync(CancellationToken ct = default) =>
         GetAsync<MeResponse>("api/device/me", ct);

@@ -19,6 +19,10 @@ public sealed class TrayContext : ApplicationContext
     private PairingForm? _pairingForm;
     private PrinterMappingForm? _mappingForm;
     private StatusForm? _statusForm;
+    private UpdateChecker? _updater;
+
+    /// <summary>Set while an update balloon is on screen; the balloon click opens this URL.</summary>
+    private string? _updateDownloadUrl;
 
     /// <summary>Prepares the tray icon and starts the worker (or the pairing dialog on first run).</summary>
     public TrayContext(string? deepLink)
@@ -64,6 +68,7 @@ public sealed class TrayContext : ApplicationContext
             Visible = true,
         };
         _tray.DoubleClick += (_, _) => ShowStatus();
+        _tray.BalloonTipClicked += (_, _) => OpenUpdateDownload();
     }
 
     private static Icon LoadTrayIcon()
@@ -94,6 +99,7 @@ public sealed class TrayContext : ApplicationContext
         _worker.StatusChanged += OnWorkerStatusChanged;
         _worker.NotifyUser += OnWorkerNotify;
         _worker.Start();
+        StartUpdateChecker(api);
         Logger.Info($"Worker started (device {_store.DeviceId}, shop {_store.ShopName}).");
     }
 
@@ -108,11 +114,15 @@ public sealed class TrayContext : ApplicationContext
 
     private void OnWorkerNotify(string message, BalloonKind kind)
     {
-        PostToUi(() => _tray.ShowBalloonTip(
-            6000,
-            Program.AppTitle,
-            message,
-            kind == BalloonKind.Error ? ToolTipIcon.Error : ToolTipIcon.Info));
+        PostToUi(() =>
+        {
+            _updateDownloadUrl = null; // a worker balloon is never an update notice
+            _tray.ShowBalloonTip(
+                6000,
+                Program.AppTitle,
+                message,
+                kind == BalloonKind.Error ? ToolTipIcon.Error : ToolTipIcon.Info);
+        });
     }
 
     private void PostToUi(Action action)
@@ -171,6 +181,7 @@ public sealed class TrayContext : ApplicationContext
             api.SetDeviceToken(_store.DeviceToken);
             _worker.RestartWith(api);
             _api = api;
+            StartUpdateChecker(api); // re-pair may point at a different server
         }
 
         _tray.ShowBalloonTip(
@@ -178,6 +189,7 @@ public sealed class TrayContext : ApplicationContext
             Program.AppTitle,
             $"Paired with “{_store.ShopName}”. Now choose your printers.",
             ToolTipIcon.Info);
+        _updateDownloadUrl = null; // pairing balloon, not an update notice
         UpdateTrayText(_worker!.Status);
 
         // The shop cannot receive a single job until printers are mapped — open the
@@ -203,6 +215,54 @@ public sealed class TrayContext : ApplicationContext
     /// <summary>Number of printers currently mapped for jobs (shown in the status window).</summary>
     public int MappedPrinterCount => _store.GetPrinters().Count;
 
+    private void StartUpdateChecker(ApiClient api)
+    {
+        _updater?.Dispose();
+        _updater = new UpdateChecker(api);
+        _updater.UpdateAvailable += OnUpdateAvailable;
+        _updater.Start();
+    }
+
+    private void OnUpdateAvailable(string version, string downloadUrl)
+    {
+        PostToUi(() =>
+        {
+            _updateDownloadUrl = downloadUrl;
+            _tray.ShowBalloonTip(
+                12000,
+                Program.AppTitle,
+                $"नया वर्जन {version} आ गया है — अपडेट करो।\n" +
+                "इस सूचना पर क्लिक करो, नया ऐप डाउनलोड हो जाएगा।\n" +
+                $"(New version {version} is available — click here to download it.)",
+                ToolTipIcon.Info);
+        });
+    }
+
+    /// <summary>
+    /// Opens the newest installer in the default browser when the update balloon is
+    /// clicked. Clicks on other balloons do nothing (the URL is cleared then).
+    /// </summary>
+    private void OpenUpdateDownload()
+    {
+        var url = _updateDownloadUrl;
+        if (string.IsNullOrWhiteSpace(url)) return;
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true };
+            System.Diagnostics.Process.Start(psi);
+            Logger.Info("Opened the update download URL: " + url);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Could not open the update download URL: " + ex.Message);
+        }
+        finally
+        {
+            _updateDownloadUrl = null;
+        }
+    }
+
     private void ShowStatus()
     {
         if (_statusForm is { IsDisposed: false })
@@ -221,6 +281,8 @@ public sealed class TrayContext : ApplicationContext
         try
         {
             _shutdownCts.Cancel();
+            _updater?.Dispose();
+            _updater = null;
             _worker?.Dispose();
             _worker = null;
             _api?.Dispose();

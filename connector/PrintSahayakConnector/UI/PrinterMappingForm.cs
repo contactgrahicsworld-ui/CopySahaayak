@@ -42,6 +42,7 @@ public sealed class PrinterMappingForm : Form
     private readonly Button _saveButton = new();
     private readonly Button _refreshButton = new();
     private readonly Button _closeButton = new();
+    private readonly Button _addPrinterButton = new();
     private readonly Label _infoLabel = new();
 
     /// <summary>Raised after the mappings were saved (the tray context heartbeats immediately).</summary>
@@ -62,34 +63,45 @@ public sealed class PrinterMappingForm : Form
         ClientSize = new Size(640, 470);
         Icon = TryLoadIcon();
 
-        _infoLabel.Text = "Tick the printers that should receive jobs and pick how they print. " +
-                          "Saved settings are pushed to the shop server immediately.";
+        // Multi-line, Hindi-capable: the guidance label is the main helper for
+        // low-literacy shop owners, so give it room for two lines of Devanagari.
+        _infoLabel.Text = "इन प्रिंटर पर काम छपेगा — ✓ लगाओ, रंग चुनो, फिर \"Save\" दबाओ।\n" +
+                          "Tick the printers that should receive jobs, then click Save. Saved settings are pushed to the shop server immediately.";
         _infoLabel.Location = new Point(14, 12);
-        _infoLabel.Size = new Size(612, 30);
+        _infoLabel.Size = new Size(612, 44);
+        _infoLabel.Font = new Font("Segoe UI", 9.75f);
 
         BuildGrid();
 
+        _addPrinterButton.Text = "प्रिंटर जोड़ें (Windows)";
+        _addPrinterButton.Size = new Size(196, 28);
+        _addPrinterButton.Location = new Point(14, 424);
+        _addPrinterButton.UseVisualStyleBackColor = true;
+        _addPrinterButton.Font = new Font("Segoe UI", 9f);
+        _addPrinterButton.Click += (_, _) => OpenWindowsPrinterSettings();
+
         _saveButton.Text = "Save";
         _saveButton.Size = new Size(88, 28);
-        _saveButton.Location = new Point(440, 424);
+        _saveButton.Location = new Point(482, 424);
         _saveButton.UseVisualStyleBackColor = true;
         _saveButton.Click += (_, _) => Save();
 
-        _refreshButton.Text = "Rescan";
-        _refreshButton.Size = new Size(88, 28);
-        _refreshButton.Location = new Point(532, 424);
+        _refreshButton.Text = "फिर से देखें (Rescan)";
+        _refreshButton.Size = new Size(160, 28);
+        _refreshButton.Location = new Point(218, 424);
         _refreshButton.UseVisualStyleBackColor = true;
+        _refreshButton.Font = new Font("Segoe UI", 9f);
         _refreshButton.Click += (_, _) => ReloadGrid();
 
         _closeButton.Text = "Close";
         _closeButton.Size = new Size(88, 28);
-        _closeButton.Location = new Point(348, 424);
+        _closeButton.Location = new Point(386, 424);
         _closeButton.UseVisualStyleBackColor = true;
         _closeButton.Click += (_, _) => Close();
 
         CancelButton = _closeButton;
 
-        Controls.AddRange(new Control[] { _infoLabel, _grid, _closeButton, _saveButton, _refreshButton });
+        Controls.AddRange(new Control[] { _infoLabel, _grid, _addPrinterButton, _closeButton, _saveButton, _refreshButton });
 
         Load += (_, _) => ReloadGrid();
     }
@@ -261,12 +273,13 @@ public sealed class PrinterMappingForm : Form
         {
             if (row.Cells[ColEnabled].Value is true) enabledCount++;
         }
-        _infoLabel.Text = count == 0
-            ? "No printers are installed on this computer. Install a printer in Windows first, then click Rescan."
-            : enabledCount == 0
-                ? $"{count} printer(s) found — tick “Use” on at least one printer, choose its colour mode, then click Save."
-                : $"{count} printer(s) found, {enabledCount} enabled — click Save to push them to the shop server.";
         _saveButton.Enabled = count > 0;
+        _infoLabel.Text = count == 0
+            ? "इस कंप्यूटर पर कोई प्रिंटर नहीं मिला। पहले Windows में प्रिंटर जोड़ो — नीचे \"प्रिंटर जोड़ें (Windows)\" दबाओ। " +
+              "प्रिंटर जुड़ जाए तो \"फिर से देखें\" दबाओ। (No printers installed — add one in Windows, then click Rescan.)"
+            : enabledCount == 0
+                ? $"{count} प्रिंटर मिले — किसी एक पर \"Use\" ✓ लगाओ, रंग चुनो, फिर \"Save\" दबाओ। ({count} printer(s) found — tick Use on at least one, then Save.)"
+                : $"{count} प्रिंटर मिले, {enabledCount} चुने गए — \"Save\" दबाओ, दुकान को पता चल जाएगा। ({count} found, {enabledCount} enabled — click Save to push them to the shop server.)";
     }
 
     private static IEnumerable<string> EnumerateInstalledPrinters()
@@ -279,6 +292,36 @@ public sealed class PrinterMappingForm : Form
         }
 
         return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Opens Windows' own printer management page so the owner can add a printer.
+    /// Windows 10/11 use ms-settings:; older systems fall back to the classic
+    /// Control Panel view. Nothing breaks when both fail — the user can still add
+    /// a printer manually, and the Rescan button picks it up afterwards.
+    /// </summary>
+    private void OpenWindowsPrinterSettings()
+    {
+        Logger.Info("Opening Windows printer settings for the owner.");
+        if (!TryStart("ms-settings:printers"))
+        {
+            TryStart("control printers");
+        }
+    }
+
+    private static bool TryStart(string target)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(target) { UseShellExecute = true };
+            System.Diagnostics.Process.Start(psi);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Could not open '{target}': {ex.Message}");
+            return false;
+        }
     }
 
     private Dictionary<string, (bool Enabled, string ColorMode, string PaperSize)> CaptureGridState()

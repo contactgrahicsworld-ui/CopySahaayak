@@ -159,8 +159,8 @@ public sealed class StatusForm : Form
 
         var mapped = _store.GetPrinters().Count;
         _printersValue.Text = mapped == 0
-            ? "NONE — open Printer Settings… and tick at least one printer"
-            : $"{mapped} ready to receive jobs";
+            ? "कोई नहीं — Printer Settings… खोलकर कम से कम एक प्रिंटर ✓ करो"
+            : $"{mapped} तैयार — काम छपेगा (ready to receive jobs)";
         _printersValue.ForeColor = mapped == 0 && _store.IsPaired ? Color.Firebrick : SystemColors.ControlText;
 
         _activityValue.Text = string.IsNullOrWhiteSpace(status.Detail) ? "—" : status.Detail;

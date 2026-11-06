@@ -32,7 +32,7 @@ async function getLatestRelease(): Promise<ReleaseInfo> {
       tag_name?: string
       assets?: { name?: string; size?: number }[]
     }
-    const version = typeof data.tag_name === 'string' ? data.tag_name.replace(/^connector-/, '') : null
+    const version = typeof data.tag_name === 'string' ? data.tag_name.replace(/^connector-v?/, '') : null
     const asset = (data.assets ?? []).find((a) => a.name === 'DesktopSahaayak-Setup.exe')
     const sizeMb = asset?.size ? (asset.size / (1024 * 1024)).toFixed(0) : null
     return { version, sizeMb }

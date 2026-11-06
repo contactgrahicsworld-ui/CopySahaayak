@@ -56,3 +56,6 @@ public sealed record ClaimResponse(ClaimedJob? Job);
 
 /// <summary>Request body for <c>POST /api/device/jobs/&lt;id&gt;/events</c>.</summary>
 public sealed record JobEventRequest(string Status, string? Message);
+
+/// <summary>Answer of the public <c>GET /api/downloads/connector/version</c> endpoint.</summary>
+public sealed record UpdateInfo(string? Version, string? DownloadUrl, string? Notes);
