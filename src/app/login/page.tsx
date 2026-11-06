@@ -28,9 +28,10 @@ function LoginForm() {
 
   useEffect(() => {
     // Show the one-time platform setup link only while no SUPER_ADMIN exists.
+    // /api/setup responds { setupDone: boolean } at the top level.
     fetch('/api/setup')
       .then((r) => r.json())
-      .then((d) => setSetupPending(Boolean(d?.data && d.data.setupDone === false)))
+      .then((d) => setSetupPending(d?.setupDone === false))
       .catch(() => {})
   }, [])
 

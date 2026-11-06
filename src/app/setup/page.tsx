@@ -27,10 +27,11 @@ export default function SetupPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    // /api/setup responds { setupDone: boolean } at the top level.
     fetch('/api/setup')
       .then((r) => r.json())
       .then((d) => {
-        if (d?.data?.setupDone) setLocked(true)
+        if (d?.setupDone) setLocked(true)
       })
       .catch(() => {})
       .finally(() => setChecking(false))
