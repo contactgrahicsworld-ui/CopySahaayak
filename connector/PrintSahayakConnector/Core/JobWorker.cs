@@ -50,7 +50,7 @@ public sealed class DeviceRevokedException : Exception
 /// </summary>
 public sealed class JobWorker : IDisposable
 {
-    private static readonly TimeSpan ClaimInterval = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan ClaimInterval = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan InitialBackoff = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(5);

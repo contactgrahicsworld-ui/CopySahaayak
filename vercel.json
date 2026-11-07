@@ -1,6 +1,14 @@
 {
   "crons": [
     {
+      "path": "/api/cron/weekly-report",
+      "schedule": "30 22 * * 6"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "30 22 * * 0"
+    },
+    {
       "path": "/api/cron/plan-reminders",
       "schedule": "30 3 * * *"
     },

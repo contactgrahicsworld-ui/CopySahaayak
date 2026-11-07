@@ -369,6 +369,46 @@ async function main() {
     }
   }
 
+  // ---------- 8b. Mandatory customer identity + accept-without-UTR ----------
+  console.log('[8b] Mandatory naam/mobile + accept without UTR')
+  {
+    // Fresh upload so this section owns its document (earlier one is block-scoped)
+    const { PDFDocument, StandardFonts } = await import('pdf-lib')
+    const pdf = await PDFDocument.create()
+    const page = pdf.addPage([595, 842])
+    page.drawText('Accept-flow test page', { x: 60, y: 700, size: 28 })
+    const form = new FormData()
+    form.append('file', new Blob([Buffer.from(await pdf.save())], { type: 'application/pdf' }), 'accept-flow.pdf')
+    const up = await req(`/api/shops/${SHOP_A.slug}/uploads`, { method: 'POST', body: form, jar: jarCustomer })
+    const items = [{ documentId: up.data?.documentId, colorMode: 'BW', paperSize: 'A4', duplex: false, copies: 1 }]
+
+    const noName = await req(`/api/shops/${SHOP_A.slug}/orders`, { method: 'POST', jar: jarCustomer, body: { customerPhone: '9820011223', items } })
+    check('order without naam rejected 400', noName.res.status === 400, `got ${noName.res.status}`)
+    const badPhone = await req(`/api/shops/${SHOP_A.slug}/orders`, { method: 'POST', jar: jarCustomer, body: { customerName: 'Test Customer', customerPhone: '12345', items } })
+    check('order with invalid mobile rejected 400', badPhone.res.status === 400, `got ${badPhone.res.status}`)
+
+    // Valid order, NO UTR — shop accepts it directly (cash / direct UPI at counter)
+    const ord3 = await req(`/api/shops/${SHOP_A.slug}/orders`, { method: 'POST', jar: jarCustomer, body: { customerName: 'Cash Customer', customerPhone: '9820044556', items } })
+    check('UTR-less order created', ord3.res.status === 200, JSON.stringify(ord3.data))
+    if (ord3.res.status === 200) {
+      const list = await req('/api/admin/payments?status=ACTION', { jar: jarA })
+      const prow = list.data?.payments?.find((p) => p.order.orderNumber === ord3.data.orderNumber)
+      check('pending payment visible in ACTION list', !!prow)
+      if (prow) {
+        const acc = await req(`/api/admin/payments/${prow.id}`, { method: 'POST', jar: jarA, body: { action: 'VERIFY', note: 'cash accepted (e2e)' } })
+        check('accept without UTR succeeds', acc.res.status === 200, JSON.stringify(acc.data))
+        const orows = await req('/api/admin/orders?status=CONFIRMED', { jar: jarA })
+        const orow = orows.data?.orders?.find((o) => o.orderNumber === ord3.data.orderNumber)
+        check('order CONFIRMED after accept', orow?.status === 'CONFIRMED', `got ${orow?.status}`)
+        check('print job queued instantly after accept', (orow?.printJobs || []).some((j) => ['QUEUED', 'CLAIMED', 'SPOOLING', 'COMPLETED'].includes(j.status)), JSON.stringify(orow?.printJobs))
+        const acc2 = await req(`/api/admin/payments/${prow.id}`, { method: 'POST', jar: jarA, body: { action: 'VERIFY' } })
+        check('double accept rejected 409', acc2.res.status === 409, `got ${acc2.res.status}`)
+        // Customer identity visible to the shop
+        check('customer naam+mobile stored', orow?.customerName === 'Cash Customer' && orow?.customerPhone === '9820044556', JSON.stringify({ n: orow?.customerName, p: orow?.customerPhone }))
+      }
+    }
+  }
+
   // ---------- 9. Super admin subscription flow ----------
   console.log('[9] Subscription payment verification (Super Admin)')
   {

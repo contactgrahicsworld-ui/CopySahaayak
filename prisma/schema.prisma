@@ -132,6 +132,7 @@ model Shop {
   subscriptionPayments SubscriptionPayment[]
   auditLogs         AuditLog[]
   notifications     Notification[]
+  weeklyReports     WeeklyReport[]
 
   @@index([isActive])
   @@schema("csp")
@@ -331,6 +332,7 @@ model Payment {
   verifications PaymentVerification[]
 
   @@index([shopId, status])
+  @@index([submittedAt])
   @@schema("csp")
 }
 
@@ -441,6 +443,7 @@ model PrintJob {
 
   @@index([shopId, status])
   @@index([deviceId, status])
+  @@index([shopId, status, createdAt])
   @@index([orderId])
   @@schema("csp")
 }
@@ -459,6 +462,30 @@ model PrintEvent {
 
   @@index([printJobId])
   @@index([shopId])
+  @@schema("csp")
+}
+
+// ============ WEEKLY BACKUP / REVENUE REPORT QUEUE ============
+// Seeded by the Sunday 04:00 IST cron; each report row is emailed one-by-one
+// (sequential, Supabase-free-tier friendly) within the run's time budget. Rows
+// that do not fit are flushed by the Monday cron and manual secret runs.
+model WeeklyReport {
+  id        String    @id @default(cuid())
+  shopId    String?   // null = platform-wide report for super admins
+  shop      Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  weekStart DateTime  // Monday 00:00 IST of the reported week
+  weekEnd   DateTime  // exclusive end (next Monday 00:00 IST)
+  recipient String    // email address
+  kind      String    // SHOP | PLATFORM
+  status    String    @default("PENDING") // PENDING | SENT | FAILED
+  attempts  Int       @default(0)
+  lastError String?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([shopId, weekStart, kind, recipient])
+  @@index([status, createdAt])
   @@schema("csp")
 }
 

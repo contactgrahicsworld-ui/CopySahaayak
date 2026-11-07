@@ -1,26 +1,42 @@
-// Email transport abstraction (no SDK dependency, plain HTTPS):
-//   1. Supabase built-in mailer (SUPABASE_URL + keys)     — see src/lib/supabase.ts
-//   2. Resend HTTP API (RESEND_API_KEY)                   — this file
+// Email transport abstraction:
+//   0. SMTP (SMTP_HOST/PORT/USER/PASS, e.g. the Gmail app password already
+//      configured in Supabase) — full attachments support, used by the weekly
+//      backup/revenue reports
+//   1. Resend HTTP API (RESEND_API_KEY)                   — plain HTTPS, attachments too
+//   2. Supabase built-in mailer (SUPABASE_URL + keys)     — see src/lib/supabase.ts
+//      (OTP-only; sendMail() cannot use it — no attachments, template locked)
 //   3. Mock transport (MAIL_MOCK=1, test deployments only) — captured in-memory,
 //      readable through the APP_SECRET-gated /api/test/outbox endpoint.
 // The forgot/reset flow picks the first available transport; when none is
 // configured the super admin can always reset a password from the platform UI.
 import crypto from 'crypto'
 
+export interface MailAttachment {
+  filename: string
+  /** Raw bytes (Node Buffer) or base64 string. */
+  content: Buffer | string
+  contentType?: string
+}
+
 export interface OutgoingMail {
   to: string
   subject: string
   text: string
   html: string
+  attachments?: MailAttachment[]
 }
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails'
 const MAIL_FROM = process.env.MAIL_FROM || 'CopySahaayak <onboarding@resend.dev>'
 
-export const mailTransport = ((): 'supabase' | 'resend' | 'mock' | 'none' => {
-  // Resend wins when configured: verified-domain sender (no spam folder),
-  // higher rate limits and it also unlocks plan-reminder emails. Supabase
-  // built-in mailer stays as the automatic fallback (shared sender, ~2 mails/hour).
+export const smtpConfigured = Boolean(
+  process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS,
+)
+
+export const mailTransport = ((): 'smtp' | 'supabase' | 'resend' | 'mock' | 'none' => {
+  // SMTP wins: real attachments (weekly Excel backups) + the same Gmail account
+  // the platform already trusts for OTP mail. Resend is the HTTP fallback.
+  if (smtpConfigured) return 'smtp'
   if (process.env.RESEND_API_KEY) return 'resend'
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return 'supabase'
   if (process.env.MAIL_MOCK === '1') return 'mock'
@@ -48,12 +64,43 @@ async function sendViaResend(mail: OutgoingMail): Promise<void> {
       subject: mail.subject,
       text: mail.text,
       html: mail.html,
+      ...(mail.attachments?.length
+        ? {
+            attachments: mail.attachments.map((a) => ({
+              filename: a.filename,
+              content: typeof a.content === 'string' ? a.content : a.content.toString('base64'),
+            })),
+          }
+        : {}),
     }),
   })
   if (res.status !== 200) {
     const detail = (await res.text()).slice(0, 200)
     throw new Error(`Resend send failed (${res.status}): ${detail}`)
   }
+}
+
+// Lazy-required so bundlers never pull nodemailer into client code.
+async function sendViaSmtp(mail: OutgoingMail): Promise<void> {
+  const nodemailer = await import('nodemailer')
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: (process.env.SMTP_PORT || '465') === '465',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  })
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: mail.to,
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    attachments: mail.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType,
+    })),
+  })
 }
 
 async function sendViaMock(mail: OutgoingMail): Promise<void> {
@@ -64,6 +111,7 @@ async function sendViaMock(mail: OutgoingMail): Promise<void> {
 
 /** Sends mail through the configured non-Supabase transport. Throws on failure. */
 export async function sendMail(mail: OutgoingMail): Promise<void> {
+  if (mailTransport === 'smtp') return sendViaSmtp(mail)
   if (mailTransport === 'resend') return sendViaResend(mail)
   if (mailTransport === 'mock') return sendViaMock(mail)
   throw new Error('No email transport configured')

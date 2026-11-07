@@ -60,6 +60,7 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
   const [order, setOrder] = useState<PlacedOrder | null>(null)
   const [utr, setUtr] = useState('')
   const [submittingUtr, setSubmittingUtr] = useState(false)
+  const [utrSkipped, setUtrSkipped] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const priceOf = useCallback(
@@ -130,8 +131,14 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
       toast({ title: 'Some options are unavailable', description: 'This shop does not offer a selected size/colour combination.', variant: 'destructive' })
       return
     }
-    if (phone && !/^[0-9+\-\s]{6,15}$/.test(phone)) {
-      toast({ title: 'Phone number looks wrong', description: 'Enter 6-15 digits or leave it empty.', variant: 'destructive' })
+    // Naam + mobile are mandatory: the shop must know WHO every order belongs to.
+    if (!name.trim() || name.trim().length < 2) {
+      toast({ title: 'अपना नाम लिखें — अनिवार्य / Name is required', description: 'दुकान को पता रहे कि ऑर्डर किसका है। / The shop needs your name for this order.', variant: 'destructive' })
+      return
+    }
+    const phoneDigits = phone.replace(/[\s\-\u00a0]/g, '').replace(/^\+?91/, '')
+    if (!/^[6-9][0-9]{9}$/.test(phoneDigits)) {
+      toast({ title: 'मोबाइल नंबर अनिवार्य है / Mobile number is required', description: '10 अंकों का सही मोबाइल नंबर डालें (जैसे 98xxxxxxxx)। / Enter a valid 10-digit mobile number.', variant: 'destructive' })
       return
     }
     setPlacing(true)
@@ -140,8 +147,8 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerName: name || undefined,
-          customerPhone: phone || undefined,
+          customerName: name.trim(),
+          customerPhone: phone,
           items: items.map((it) => ({
             documentId: it.documentId,
             colorMode: it.colorMode,
@@ -181,11 +188,20 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Could not submit reference')
       setStage('DONE')
+      setUtrSkipped(false)
     } catch (err) {
       toast({ title: 'Submission failed', description: err instanceof Error ? err.message : 'Try again', variant: 'destructive' })
     } finally {
       setSubmittingUtr(false)
     }
+  }
+
+  function skipUtr() {
+    // Cash / direct UPI at the counter: the shop accepts the payment and starts
+    // the print from its dashboard — no UTR needed from the customer.
+    setUtrSkipped(true)
+    setStage('DONE')
+    window.scrollTo({ top: 0 })
   }
 
   if (stage === 'PAY' && order) {
@@ -197,16 +213,18 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
         setUtr={setUtr}
         submitting={submittingUtr}
         onSubmit={submitUtr}
+        onSkip={skipUtr}
         onBack={() => setStage('CONFIG')}
       />
     )
   }
 
   if (stage === 'DONE' && order) {
-    return <DoneStage slug={slug} orderNumber={order.orderNumber} />
+    return <DoneStage slug={slug} orderNumber={order.orderNumber} utrSubmitted={!utrSkipped} />
   }
 
   return (
+    // CONFIG stage
     <main className="min-h-screen bg-muted/30 pb-28">
       <header className="bg-background border-b">
         <div className="container max-w-lg mx-auto px-4 py-4">
@@ -390,16 +408,16 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
         {items.length > 0 && (
           <Card>
             <CardContent className="pt-4 space-y-3">
-              <p className="text-sm font-medium">आपका नाम और फ़ोन (ऑप्शनल) / Your details (optional)</p>
-              <p className="text-[11px] text-muted-foreground -mt-2">दुकान ज़रूरत पड़ने पर आपको फ़ोन कर सके</p>
+              <p className="text-sm font-medium">आपका नाम और मोबाइल नंबर <span className="text-red-600">(अनिवार्य)</span> / Your name & mobile <span className="text-red-600">(required)</span></p>
+              <p className="text-[11px] text-muted-foreground -mt-2">ऑर्डर किसका है — दुकान को यह जानकारी ज़रूरी है / The shop needs to know whose order this is</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label htmlFor="cname" className="text-xs">Name</Label>
-                  <Input id="cname" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" />
+                  <Label htmlFor="cname" className="text-xs">नाम / Name <span className="text-red-600">*</span></Label>
+                  <Input id="cname" value={name} onChange={(e) => setName(e.target.value)} placeholder="आपका नाम / Your name" required autoComplete="name" />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="cphone" className="text-xs">Phone</Label>
-                  <Input id="cphone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98xxxxxxxx" inputMode="tel" autoComplete="tel" />
+                  <Label htmlFor="cphone" className="text-xs">मोबाइल / Mobile <span className="text-red-600">*</span></Label>
+                  <Input id="cphone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98xxxxxxxx" inputMode="tel" autoComplete="tel" required />
                 </div>
               </div>
             </CardContent>
@@ -432,7 +450,7 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
 }
 
 function PayStage({
-  shop, order, utr, setUtr, submitting, onSubmit, onBack,
+  shop, order, utr, setUtr, submitting, onSubmit, onSkip, onBack,
 }: {
   shop: ShopInfo
   order: PlacedOrder
@@ -440,6 +458,7 @@ function PayStage({
   setUtr: (v: string) => void
   submitting: boolean
   onSubmit: () => void
+  onSkip: () => void
   onBack: () => void
 }) {
   const { toast } = useToast()
@@ -485,7 +504,7 @@ function PayStage({
               </li>
               <li className="flex gap-2.5 text-sm">
                 <span className="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs">3</span>
-                <span>नीचे UTR नंबर डालकर बटन दबाएं<span className="block text-xs text-muted-foreground">Enter the UTR below and press the button</span></span>
+                <span>पेमेंट होने के बाद UTR डालें — या UTR न हो तो सीधे नीचे वाला बटन दबाएं<span className="block text-xs text-muted-foreground">Enter the UTR after paying — or press the button below if you have none</span></span>
               </li>
             </ol>
             <a href={order.upi.payload} className="block">
@@ -509,7 +528,7 @@ function PayStage({
             </div>
             <Separator />
             <div className="text-left space-y-1.5">
-              <Label htmlFor="utr" className="text-sm font-medium">UTR नंबर (UPI का रेफ़रेंस नंबर)</Label>
+              <Label htmlFor="utr" className="text-sm font-medium">UTR नंबर (ऑप्शनल — न हो तो छोड़ दें) <span className="text-muted-foreground font-normal">/ UTR (optional)</span></Label>
               <Input
                 id="utr"
                 value={utr}
@@ -536,9 +555,16 @@ function PayStage({
                 <Copy className="h-3 w-3 mr-1" aria-hidden /> Copy order number
               </Button>
             </div>
-            <Button className="w-full h-12 text-base" size="lg" onClick={onSubmit} disabled={submitting}>
+            <Button className="w-full h-12 text-base" size="lg" onClick={onSubmit} disabled={submitting || !utr.trim()}>
               {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4 mr-2" aria-hidden />}
               मैंने भुगतान कर दिया — I have paid
+            </Button>
+            <div className="relative text-center">
+              <span className="text-[11px] text-muted-foreground bg-background px-2">या / or</span>
+            </div>
+            <Button variant="outline" className="w-full h-11" onClick={onSkip} disabled={submitting}>
+              भुगतान नकद/सीधे दुकान को दिया — UTR के बिना आगे बढ़ें
+              <span className="block text-[11px] text-muted-foreground">Paying cash or directly at the shop — continue without a UTR</span>
             </Button>
           </CardContent>
         </Card>
@@ -547,18 +573,19 @@ function PayStage({
   )
 }
 
-function DoneStage({ slug, orderNumber }: { slug: string; orderNumber: string }) {
+function DoneStage({ slug, orderNumber, utrSubmitted }: { slug: string; orderNumber: string; utrSubmitted: boolean }) {
   return (
     <main className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
       <Card className="max-w-sm w-full text-center">
         <CardContent className="pt-8 pb-8 space-y-4">
           <CheckCircle2 className="h-12 w-12 mx-auto text-green-600" aria-hidden />
           <div>
-            <p className="font-bold text-lg">भेज दिया गया — रेफ़रेंस जमा हो गया</p>
-            <p className="text-xs text-muted-foreground mb-1">Reference submitted</p>
+            <p className="font-bold text-lg">{utrSubmitted ? 'भेज दिया गया — रेफ़रेंस जमा हो गया' : 'ऑर्डर दुकान को भेज दिया गया'}</p>
+            <p className="text-xs text-muted-foreground mb-1">{utrSubmitted ? 'Reference submitted' : 'Order sent to the shop'}</p>
             <p className="text-sm text-muted-foreground">
-              ऑर्डर <strong>{orderNumber}</strong> — दुकान भुगतान जाँच कर प्रिंट शुरू करेगी। नीचे बटन दबाकर स्थिति देखें।
-              <span className="block mt-0.5">Track live status here — the shop verifies payment, then prints.</span>
+              {utrSubmitted
+                ? <>ऑर्डर <strong>{orderNumber}</strong> — दुकान भुगतान जाँच कर प्रिंट शुरू करेगी। नीचे बटन दबाकर स्थिति देखें।<span className="block mt-0.5">Track live status here — the shop verifies payment, then prints.</span></>
+                : <>ऑर्डर <strong>{orderNumber}</strong> — दुकान से भुगतान लेकर वह प्रिंट शुरू करेगी (नकद/सीधे दिया हो तो दुकान accept करेगी)।<span className="block mt-0.5">Order {orderNumber} — the shop accepts your payment (cash/direct) and starts printing.</span></>}
             </p>
           </div>
           <Button asChild className="w-full h-12 text-base">

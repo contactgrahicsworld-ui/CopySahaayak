@@ -10,10 +10,19 @@ export async function GET(req: Request) {
     const ctx = await requireAnyShopAdmin()
     const shopId = ctx.user.shopId
     const url = new URL(req.url)
-    const status = url.searchParams.get('status') || 'SUBMITTED'
+    const status = url.searchParams.get('status') || 'ACTION'
+
+    // ACTION = everything the shop can act on right now: PENDING (no UTR —
+    // accept on cash/direct UPI) + SUBMITTED (UTR waiting to be verified).
+    const where =
+      status === 'ALL'
+        ? { shopId }
+        : status === 'ACTION'
+          ? { shopId, status: { in: ['PENDING', 'SUBMITTED'] } }
+          : { shopId, status }
 
     const payments = await db.payment.findMany({
-      where: { shopId, ...(status !== 'ALL' ? { status } : {}) },
+      where,
       orderBy: { submittedAt: 'desc' },
       take: 100,
       include: {

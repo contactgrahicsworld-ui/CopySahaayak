@@ -223,7 +223,7 @@ interface OrderRow {
   customerName?: string
   customerPhone?: string
   createdAt: string
-  payment?: { status: string; utr?: string; rejectionReason?: string }
+  payment?: { id?: string; status: string; utr?: string; rejectionReason?: string }
   items: Array<{ id: string; colorMode: string; paperSize: string; copies: number; duplex: boolean; pageCount: number; totalPaise: number; document: { id: string; originalName: string } }>
   printJobs: Array<{ id: string; status: string }>
 }
@@ -275,6 +275,27 @@ function OrdersTab() {
       return
     }
     toast({ title: `Order ${action.toLowerCase().replace('_', ' ')} done` })
+    load()
+  }
+
+  // Accept the payment the shop actually received (cash / direct UPI / verified
+  // UTR): payment → VERIFIED, order → CONFIRMED, print jobs queued instantly.
+  async function acceptPayment(o: OrderRow) {
+    if (!o.payment?.id) {
+      toast({ title: 'Payment not ready', description: 'No payment row on this order yet.', variant: 'destructive' })
+      return
+    }
+    const res = await fetch(`/api/admin/payments/${o.payment.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'VERIFY', note: 'Accepted from Orders tab' }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      toast({ title: 'Accept failed', description: data.error, variant: 'destructive' })
+      return
+    }
+    toast({ title: 'ऑर्डर accept हो गया — प्रिंट कतार में / Accepted — sent to print queue' })
     load()
   }
 
@@ -347,6 +368,12 @@ function OrdersTab() {
                           <MessageCircle className="h-4 w-4 mr-1" aria-hidden />WhatsApp update
                         </Button>
                       )}
+                      {(o.status === 'PENDING_PAYMENT' || o.status === 'AWAITING_VERIFICATION') && o.payment?.id && (
+                        <Button size="sm" onClick={() => acceptPayment(o)}>
+                          <Check className="h-4 w-4 mr-1" aria-hidden />भुगतान accept करें — प्रिंट भेजें
+                          <span className="sr-only">Accept payment and send to print</span>
+                        </Button>
+                      )}
                       {o.status === 'CONFIRMED' && (
                         <Button size="sm" variant="outline" onClick={() => act(o.id, 'COMPLETE')}>Mark printed & completed</Button>
                       )}
@@ -394,7 +421,7 @@ interface PaymentRow {
 function PaymentsTab() {
   const { toast } = useToast()
   const [payments, setPayments] = useState<PaymentRow[]>([])
-  const [status, setStatus] = useState('SUBMITTED')
+  const [status, setStatus] = useState('ACTION')
   const [verify, setVerify] = useState<{ p: PaymentRow; action: 'VERIFY' | 'REJECT' } | null>(null)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -422,7 +449,7 @@ function PaymentsTab() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      toast({ title: verify.action === 'VERIFY' ? 'Payment verified — job queued to printers' : 'Payment rejected' })
+      toast({ title: verify.action === 'VERIFY' ? 'Accept हो गया — प्रिंट जॉब कतार में / Accepted — job queued' : 'Payment rejected' })
       setVerify(null)
       setNote('')
       load()
@@ -439,8 +466,8 @@ function PaymentsTab() {
         <Select value={status} onValueChange={setStatus}>
           <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {['SUBMITTED', 'VERIFIED', 'REJECTED', 'PENDING', 'ALL'].map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
+            {['ACTION', 'PENDING', 'SUBMITTED', 'VERIFIED', 'REJECTED', 'ALL'].map((s) => (
+              <SelectItem key={s} value={s}>{s === 'ACTION' ? 'ACTION (जो अभी करने हैं)' : s}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -448,7 +475,7 @@ function PaymentsTab() {
       </div>
 
       {payments.length === 0 ? (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">Nothing here. Customer UTR submissions will appear for verification.</CardContent></Card>
+        <Card><CardContent className="py-10 text-center text-muted-foreground">Nothing to act on right now. New payments (UTR या नकद) automatically appear here.</CardContent></Card>
       ) : (
         <div className="space-y-2">
           {payments.map((p) => (
@@ -457,7 +484,10 @@ function PaymentsTab() {
                 <div>
                   <p className="font-semibold text-sm">{p.order.orderNumber} · {formatInr(p.amountPaise)}</p>
                   <p className="text-xs text-muted-foreground">
-                    UTR: <strong className="text-foreground">{p.utr || '—'}</strong>
+                    {p.order.customerName ? `${p.order.customerName} · ` : ''}{p.order.customerPhone || ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    UTR: <strong className="text-foreground">{p.utr || '— (नकद/सीधे दिया)'}</strong>
                     {p.payerName ? ` · ${p.payerName}` : ''}
                     {p.submittedAt ? ` · ${new Date(p.submittedAt).toLocaleString('en-IN')}` : ''}
                   </p>
@@ -465,13 +495,13 @@ function PaymentsTab() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className={ORDER_STATUS_STYLES[p.status] || ''}>{p.status}</Badge>
-                  {p.status === 'SUBMITTED' && (
+                  {(p.status === 'PENDING' || p.status === 'SUBMITTED') && (
                     <>
                       <Button size="sm" onClick={() => { setVerify({ p, action: 'VERIFY' }); setNote('') }}>
-                        <Check className="h-4 w-4 mr-1" aria-hidden /> Verify
+                        <Check className="h-4 w-4 mr-1" aria-hidden />Accept & print
                       </Button>
                       <Button size="sm" variant="destructive" onClick={() => { setVerify({ p, action: 'REJECT' }); setNote('') }}>
-                        <X className="h-4 w-4 mr-1" aria-hidden /> Reject
+                        <X className="h-4 w-4 mr-1" aria-hidden />Reject
                       </Button>
                     </>
                   )}
@@ -485,11 +515,11 @@ function PaymentsTab() {
       <Dialog open={!!verify} onOpenChange={(v) => !v && setVerify(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{verify?.action === 'VERIFY' ? 'Verify payment' : 'Reject payment'}</DialogTitle>
+            <DialogTitle>{verify?.action === 'VERIFY' ? 'भुगतान accept करें / Accept payment' : 'Reject payment'}</DialogTitle>
             <DialogDescription>
-              {verify?.p.order.orderNumber} · {verify ? formatInr(verify.p.amountPaise) : ''} · UTR {verify?.p.utr}.
+              {verify?.p.order.orderNumber} · {verify ? formatInr(verify.p.amountPaise) : ''} · UTR {verify?.p.utr || '—'}.
               {verify?.action === 'VERIFY'
-                ? ' Confirm the amount actually arrived in your bank/UPI app before verifying. Verifying queues the print jobs.'
+                ? ' पुष्टि करें कि रकम आपके खाते/हाथ में आ गई है। Accept करते ही प्रिंट जॉब कतार में चला जाएगा। Confirm the money actually arrived before accepting — accepting queues the print jobs instantly.'
                 : ' Rejecting informs the customer. They can place the order again.'}
             </DialogDescription>
           </DialogHeader>

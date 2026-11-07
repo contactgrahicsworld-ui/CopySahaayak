@@ -1,5 +1,5 @@
 // Claim a print job. Atomic via transaction + lease; dedupes by completed state.
-import { db, TX } from '@/lib/db'
+import { db, TX, retryDb } from '@/lib/db'
 import { handleRoute, jsonError } from '@/lib/api'
 import { authenticateDevice } from '@/lib/auth'
 import { RATE_LIMITS } from '@/lib/rate-limit'
@@ -13,7 +13,8 @@ export async function POST(req: Request) {
     const device = await authenticateDevice(req)
     if (!device) return jsonError(401, 'Device not authenticated')
 
-    const job = await db.$transaction(async (tx) => {
+    const job = await retryDb(() =>
+      db.$transaction(async (tx) => {
       // Release jobs whose claim lease expired (device crash / network loss
       // mid-print) — without this sweep a CLAIMED job would be stuck forever
       // because the query below only looks at QUEUED.
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
         },
         include: { orderItem: true, document: true, printer: true, order: true },
       })
-    }, TX)
+    }, TX))
 
     if (!job) return Response.json({ job: null })
     if (job.attempts > job.maxAttempts) {

@@ -1,6 +1,6 @@
 // Order lifecycle: creation, UPI QR, UTR submission, verification, print job fan-out,
 // spooler-verified completion. All state transitions live here — API routes stay thin.
-import { db, TX } from '@/lib/db'
+import { db, TX, retryDb } from '@/lib/db'
 import { LIMITS, type ColorMode, type PaperSize } from '@/lib/constants'
 import { HttpError } from '@/lib/auth'
 import { calculatePrice } from '@/lib/pricing'
@@ -115,7 +115,8 @@ export async function createOrder(input: CreateOrderInput) {
   await settings.all() // refresh cache so the synchronous prefix getter is current
   const number = orderNumber(settings.orderPrefix)
 
-  const order = await db.$transaction(async (tx) => {
+  const order = await retryDb(() =>
+    db.$transaction(async (tx) => {
     const created = await tx.order.create({
       data: {
         shopId: shop.id,
@@ -154,7 +155,7 @@ export async function createOrder(input: CreateOrderInput) {
       data: { shopId: shop.id, audience: 'SHOP', title: `New order ${created.orderNumber}`, body: `Amount ₹${(total / 100).toFixed(2)} — awaiting UPI payment` },
     })
     return created
-  }, TX)
+  }, TX))
 
   await audit({
     shopId: shop.id,
@@ -178,7 +179,8 @@ export async function submitUtr(orderId: string, utr: string, payerName?: string
   if (payment.status === 'VERIFIED') throw new HttpError(409, 'Payment already verified')
   if (payment.status === 'SUBMITTED') throw new HttpError(409, 'Payment already submitted and awaiting verification')
 
-  const updated = await db.$transaction(async (tx) => {
+  const updated = await retryDb(() =>
+    db.$transaction(async (tx) => {
     const p = await tx.payment.update({
       where: { id: payment.id },
       data: {
@@ -197,7 +199,7 @@ export async function submitUtr(orderId: string, utr: string, payerName?: string
       data: { shopId: payment.shopId, audience: 'SHOP', title: `Payment submitted for ${payment.order.orderNumber}`, body: `UTR ${utr} — verify in Payments tab` },
     })
     return p
-  }, TX)
+  }, TX))
   await audit({
     shopId: payment.shopId,
     actorType: 'CUSTOMER',
@@ -222,10 +224,17 @@ export async function verifyPayment(
 ) {
   const payment = await db.payment.findUnique({ where: { id: paymentId }, include: { order: true } })
   if (!payment) throw new HttpError(404, 'Payment not found')
-  if (payment.status !== 'SUBMITTED') throw new HttpError(409, 'Payment is not awaiting verification')
-  if (!payment.utr) throw new HttpError(409, 'No UTR reference was submitted')
+  // PENDING (customer never submitted a UTR — e.g. cash or direct UPI on the
+  // counter) and SUBMITTED (UTR waiting) are both actionable. VERIFIED/REJECTED
+  // are final states.
+  if (!['PENDING', 'SUBMITTED'].includes(payment.status)) {
+    throw new HttpError(409, 'Payment is not awaiting verification')
+  }
+  // UTR is optional now: the shop accepts the money it actually received.
+  // When a UTR was submitted it is kept in the audit trail below.
 
-  await db.$transaction(async (tx) => {
+  await retryDb(() =>
+    db.$transaction(async (tx) => {
     if (action === 'VERIFY') {
       await tx.payment.update({
         where: { id: payment.id },
@@ -245,7 +254,7 @@ export async function verifyPayment(
     await tx.paymentVerification.create({
       data: { paymentId: payment.id, action, adminUserId: adminUser.id, note: note || null },
     })
-  }, TX)
+  }, TX))
 
   if (action === 'VERIFY') {
     await enqueuePrintJobs(payment.orderId)
@@ -319,7 +328,8 @@ export async function recordPrintEvent(jobId: string, status: 'SPOOLING' | 'COMP
     throw new HttpError(409, 'COMPLETED requires a SPOOLING event first (spooler verification)')
   }
 
-  await db.$transaction(async (tx) => {
+  await retryDb(() =>
+    db.$transaction(async (tx) => {
     await tx.printEvent.create({
       data: { printJobId: job.id, shopId: job.shopId, deviceId, status, message: message?.slice(0, 480) || null },
     })
@@ -346,7 +356,7 @@ export async function recordPrintEvent(jobId: string, status: 'SPOOLING' | 'COMP
         await tx.order.update({ where: { id: job.orderId }, data: { status: 'COMPLETED', completedAt: new Date() } })
       }
     }
-  }, TX)
+  }, TX))
 }
 
 export async function ensureSubscriptionUsable(shopId: string, subscription: { status: string; expiresAt: Date | null } | null) {

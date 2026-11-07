@@ -15,9 +15,19 @@ export const orderItemSchema = z.object({
   pageTo: z.number().int().min(1).max(2000).nullable().optional(),
 })
 
+// Indian mobile: optional +91/91 prefix, then 10 digits starting 6-9.
+// Spaces/hyphens are stripped before this schema sees the value (normalisePhone).
+export const indianMobileSchema = z
+  .string()
+  .transform((v) => v.replace(/[\s\-\u00a0]/g, ''))
+  .refine((v) => /^(\+?91)?[6-9][0-9]{9}$/.test(v), 'Mobile number must be a valid 10-digit Indian number')
+  .transform((v) => (v.startsWith('+91') ? v.slice(3) : v.startsWith('91') && v.length === 12 ? v.slice(2) : v))
+
 export const createOrderSchema = z.object({
-  customerName: z.string().trim().max(80).optional(),
-  customerPhone: z.string().trim().regex(/^[0-9+\-\s]{6,15}$/).optional(),
+  // Mandatory customer identity: the shop must always know WHO the order belongs
+  // to (naam + mobile), even when the customer never submits a UTR.
+  customerName: z.string().trim().min(2, 'Name is required (kam se kam 2 letters)').max(80),
+  customerPhone: indianMobileSchema,
   notes: z.string().trim().max(300).optional(),
   items: z.array(orderItemSchema).min(1).max(10),
 })
