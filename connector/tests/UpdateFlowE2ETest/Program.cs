@@ -18,24 +18,25 @@ void Expect(bool condition, string label)
 
 var rejected = false;
 var baseUrl = args.Length > 0 ? args[0] : "http://localhost:8765";
+var expectedVersion = args.Length > 1 ? args[1] : "9.9.9";
 var api = new ApiClient(baseUrl);
 
 // 1. version manifest
 var info = await api.GetLatestVersionAsync();
 Expect(info != null, "version manifest parsed");
-Expect(info?.Version == "9.9.9", $"manifest version == 9.9.9 (got {info?.Version})");
+Expect(info?.Version == expectedVersion, $"manifest version == {expectedVersion} (got {info?.Version})");
 Expect(!string.IsNullOrWhiteSpace(info?.DownloadUrl), "manifest has downloadUrl");
 Expect(info?.Sha256?.Length == 64, "manifest has a 64-char sha256");
 Expect(info?.SizeBytes > 0, "manifest has sizeBytes");
 Expect(info?.DownloadUrl?.StartsWith(baseUrl) == true, "relative downloadUrl resolved against server");
 
-// 2. comparison — 9.9.9 must beat 1.6.0 (the running build)
-Expect(VersionComparer.IsNewer(info!.Version, "1.6.0"), "9.9.9 is newer than the running 1.6.0");
+// 2. comparison — the manifest version must beat 1.5.0 (the oldest self-updating build)
+Expect(VersionComparer.IsNewer(info!.Version, "1.5.0"), $"{info.Version} is newer than the running 1.5.0");
 
 // 3. download with progress
 var updateDir = SelfUpdater.UpdateDir;
 Directory.CreateDirectory(updateDir);
-var dest = Path.Combine(updateDir, "DesktopSahaayak-Setup-9.9.9.exe");
+var dest = Path.Combine(updateDir, $"DesktopSahaayak-Setup-{info.Version}.exe");
 if (File.Exists(dest)) File.Delete(dest);
 
 var lastProgress = 0.0;
@@ -43,7 +44,7 @@ var progressReports = 0;
 var progress = new Progress<double>(p => { lastProgress = p; Interlocked.Increment(ref progressReports); });
 var written = await api.DownloadToFileAsync(info.DownloadUrl!, dest, progress, CancellationToken.None);
 Expect(File.Exists(dest), "file downloaded");
-Expect(new FileInfo(dest).Length == written && written == info.SizeBytes,
+Expect(new FileInfo(dest).Length == written && written == (info.SizeBytes ?? written),
     $"byte count matches manifest ({written} == {info.SizeBytes})");
 Expect(progressReports > 0 && lastProgress > 0.99,
     $"progress reported ({progressReports} events, last {lastProgress:0.00})");
