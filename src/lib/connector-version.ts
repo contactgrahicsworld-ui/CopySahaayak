@@ -10,6 +10,6 @@ export const CONNECTOR_DOWNLOAD_PATH = '/api/downloads/connector'
 // in by scripts/publish-release.sh AFTER the CI-built release assets are downloaded
 // and verified — an empty string means "not verified yet" and the endpoint omits
 // them, so the connector skips its checksum check instead of failing.
-export const CONNECTOR_SETUP_SHA256 = 'd57c29f5a7d396d890e3d463c728a94f915bf3f97b0c57db9b3e3e70d2250a39'
+export const CONNECTOR_SETUP_SHA256 = 'b42585fa3460c29f8a9cacbb6243456e60cfd1502ea6f6e783c88eac897604be'
 
-export const CONNECTOR_SETUP_SIZE_BYTES = 52118288
+export const CONNECTOR_SETUP_SIZE_BYTES = 52122554
