@@ -159,6 +159,64 @@ public sealed class ApiClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Dedicated client for the self-update download: 30 minutes instead of the
+    /// 2-minute API timeout, because a 50 MB installer on a slow shop broadband
+    /// line can legitimately take longer than two minutes. Static so the handler
+    /// is reused and never dropped mid-download.
+    /// </summary>
+    private static readonly HttpClient DownloadClient = new()
+    {
+        Timeout = TimeSpan.FromMinutes(30),
+    };
+
+    /// <summary>
+    /// Streams the update file at <paramref name="url"/> (absolute, or relative to
+    /// this client's server URL) to <paramref name="destPath"/>, reporting progress
+    /// in the 0..1 range. Throws on any HTTP or network error; the caller decides
+    /// what the shop sees.
+    /// </summary>
+    public async Task<long> DownloadToFileAsync(
+        string url, string destPath, IProgress<double>? progress, CancellationToken ct)
+    {
+        string absolute;
+        if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            absolute = url;
+        }
+        else
+        {
+            // Resolve relative URLs against this connector's own server, exactly
+            // like GetLatestVersionAsync does for the downloadUrl field.
+            absolute = new Uri(new Uri(ServerUrl + "/"), url.TrimStart('/')).ToString();
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, absolute);
+        using var response = await DownloadClient.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException(response.StatusCode, null);
+
+        var total = response.Content.Headers.ContentLength ?? -1;
+        var directory = Path.GetDirectoryName(destPath);
+        if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+        await using var httpStream = await response.Content.ReadAsStreamAsync(ct);
+        await using var file = new FileStream(
+            destPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+        var buffer = new byte[81920];
+        long written = 0;
+        int read;
+        while ((read = await httpStream.ReadAsync(buffer, ct)) > 0)
+        {
+            await file.WriteAsync(buffer.AsMemory(0, read), ct);
+            written += read;
+            if (progress != null && total > 0) progress.Report((double)written / total);
+        }
+
+        return total > 0 ? total : written;
+    }
+
     /// <summary>GET /api/device/me — pairing state, shop and server-side printer list.</summary>
     public Task<MeResponse> GetMeAsync(CancellationToken ct = default) =>
         GetAsync<MeResponse>("api/device/me", ct);

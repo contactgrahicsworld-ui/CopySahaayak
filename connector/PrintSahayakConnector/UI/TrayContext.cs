@@ -5,7 +5,8 @@ namespace PrintSahayakConnector.UI;
 
 /// <summary>
 /// The whole application lives in this <see cref="ApplicationContext"/>: tray icon
-/// and menu, worker lifecycle, pairing dialog, printer mapping and status window.
+/// and menu, worker lifecycle, pairing dialog, printer mapping, status window and
+/// the one-click self-update.
 /// </summary>
 public sealed class TrayContext : ApplicationContext
 {
@@ -21,8 +22,11 @@ public sealed class TrayContext : ApplicationContext
     private StatusForm? _statusForm;
     private UpdateChecker? _updater;
 
-    /// <summary>Set while an update balloon is on screen; the balloon click opens this URL.</summary>
-    private string? _updateDownloadUrl;
+    // --- self-update state (all touched on the UI thread only) -----------------
+    private UpdateInfo? _pendingUpdate;      // newest version waiting for a click
+    private bool _updateBusy;                // download/install in progress
+    private bool _updateDeferred;            // printer was busy; start once idle
+    private UpdateProgressForm? _progressForm;
 
     /// <summary>Prepares the tray icon and starts the worker (or the pairing dialog on first run).</summary>
     public TrayContext(string? deepLink)
@@ -32,6 +36,8 @@ public sealed class TrayContext : ApplicationContext
         _store = new LocalStore(Path.Combine(Logger.AppDataRoot, "state.db"));
 
         BuildTrayIcon();
+        SelfUpdater.CleanStaleDownloads();
+        NotifyIfUpdated();
 
         var link = DeepLinkParser.Parse(deepLink);
         if (_store.IsPaired)
@@ -57,6 +63,7 @@ public sealed class TrayContext : ApplicationContext
         menu.Items.Add("Open Logs", null, (_, _) => Logger.OpenLogFolder());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Check for Jobs Now", null, (_, _) => _worker?.CheckNow());
+        menu.Items.Add("अपडेट चेक करो (Check for Updates)", null, (_, _) => _ = ManualUpdateCheckAsync());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Exit());
 
@@ -68,7 +75,7 @@ public sealed class TrayContext : ApplicationContext
             Visible = true,
         };
         _tray.DoubleClick += (_, _) => ShowStatus();
-        _tray.BalloonTipClicked += (_, _) => OpenUpdateDownload();
+        _tray.BalloonTipClicked += (_, _) => BeginInteractiveUpdate();
     }
 
     private static Icon LoadTrayIcon()
@@ -109,14 +116,25 @@ public sealed class TrayContext : ApplicationContext
         {
             UpdateTrayText(status);
             _statusForm?.UpdateStatus(status);
+
+            // The user already asked for the update but a job was printing —
+            // start it automatically the moment the printer is free again.
+            if (_updateDeferred && !_updateBusy && _pendingUpdate != null &&
+                !IsJobRunning(status.State))
+            {
+                _updateDeferred = false;
+                StartUpdateDownload(_pendingUpdate);
+            }
         });
     }
+
+    private static bool IsJobRunning(WorkerState state) =>
+        state is WorkerState.Downloading or WorkerState.Printing or WorkerState.Reporting;
 
     private void OnWorkerNotify(string message, BalloonKind kind)
     {
         PostToUi(() =>
         {
-            _updateDownloadUrl = null; // a worker balloon is never an update notice
             _tray.ShowBalloonTip(
                 6000,
                 Program.AppTitle,
@@ -189,7 +207,6 @@ public sealed class TrayContext : ApplicationContext
             Program.AppTitle,
             $"Paired with “{_store.ShopName}”. Now choose your printers.",
             ToolTipIcon.Info);
-        _updateDownloadUrl = null; // pairing balloon, not an update notice
         UpdateTrayText(_worker!.Status);
 
         // The shop cannot receive a single job until printers are mapped — open the
@@ -223,43 +240,267 @@ public sealed class TrayContext : ApplicationContext
         _updater.Start();
     }
 
-    private void OnUpdateAvailable(string version, string downloadUrl)
+    // ---------------------------------------------------------------------------
+    // Self-update: notification → one click → download → checksum → install →
+    // automatic restart. The shop owner never visits a website or runs a file.
+    // ---------------------------------------------------------------------------
+
+    private void OnUpdateAvailable(UpdateInfo info)
     {
         PostToUi(() =>
         {
-            _updateDownloadUrl = downloadUrl;
+            _pendingUpdate = info;
             _tray.ShowBalloonTip(
                 12000,
                 Program.AppTitle,
-                $"नया वर्जन {version} आ गया है — अपडेट करो।\n" +
-                "इस सूचना पर क्लिक करो, नया ऐप डाउनलोड हो जाएगा।\n" +
-                $"(New version {version} is available — click here to download it.)",
+                $"नया वर्जन {info.Version} आ गया — इस सूचना पर क्लिक करो।\n" +
+                "ऐप खुद डाउनलोड करके अपडेट हो जाएगा।\n" +
+                $"(New version {info.Version} — click here and the app updates itself.)",
                 ToolTipIcon.Info);
         });
     }
 
-    /// <summary>
-    /// Opens the newest installer in the default browser when the update balloon is
-    /// clicked. Clicks on other balloons do nothing (the URL is cleared then).
-    /// </summary>
-    private void OpenUpdateDownload()
+    /// <summary>Runs on the UI thread when an update balloon is clicked.</summary>
+    private void BeginInteractiveUpdate()
     {
-        var url = _updateDownloadUrl;
-        if (string.IsNullOrWhiteSpace(url)) return;
+        var info = _pendingUpdate;
+        if (info == null) return; // some other balloon
 
+        if (_updateBusy)
+        {
+            _progressForm?.Activate();
+            return;
+        }
+
+        // Never interrupt a running print job.
+        if (IsJobRunning(_worker?.Status.State ?? WorkerState.Waiting))
+        {
+            _updateDeferred = true;
+            _tray.ShowBalloonTip(
+                8000,
+                Program.AppTitle,
+                "अभी प्रिंट हो रहा है — प्रिंट खत्म होते ही अपडेट खुद शुरू हो जाएगा।\n" +
+                "(A print job is running — the update starts by itself when it finishes.)",
+                ToolTipIcon.Info);
+            return;
+        }
+
+        var choice = MessageBox.Show(
+            $"नया वर्जन {info.Version} डाउनलोड और इंस्टॉल करें?\n\n" +
+            "ऐप खुद डाउनलोड करेगा, इंस्टॉल करेगा और दोबारा शुरू हो जाएगा।\n" +
+            "(Download and install the new version now? The app does everything and restarts itself.)",
+            Program.AppTitle,
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button1);
+        if (choice != DialogResult.Yes) return;
+
+        StartUpdateDownload(info);
+    }
+
+    /// <summary>Starts the download in the background and shows the progress window.</summary>
+    private void StartUpdateDownload(UpdateInfo info)
+    {
+        if (_updateBusy || _api == null) return;
+        _updateBusy = true;
+
+        var api = _api;
+        var isSetup = SelfUpdater.IsInstalledBuild();
+        var fileName = isSetup
+            ? $"DesktopSahaayak-Setup-{info.Version}.exe"
+            : $"DesktopSahaayak-{info.Version}.exe";
+        string dest;
         try
         {
-            var psi = new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true };
-            System.Diagnostics.Process.Start(psi);
-            Logger.Info("Opened the update download URL: " + url);
+            Directory.CreateDirectory(SelfUpdater.UpdateDir);
+            dest = Path.Combine(SelfUpdater.UpdateDir, fileName);
         }
         catch (Exception ex)
         {
-            Logger.Warn("Could not open the update download URL: " + ex.Message);
+            FailUpdate("अपडेट फाइल सेव नहीं हो पाई।", ex);
+            return;
         }
-        finally
+
+        var form = new UpdateProgressForm(info.Version ?? "?");
+        _progressForm = form;
+        form.Show();
+
+        // Created on the UI thread: progress callbacks marshal back here automatically.
+        var progress = new Progress<double>(f =>
         {
-            _updateDownloadUrl = null;
+            try { form.SetProgress(f, info.SizeBytes ?? 0); }
+            catch { /* the window may already be closing */ }
+        });
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                Logger.Info($"Downloading update {info.Version} from {info.DownloadUrl} …");
+                var total = await api.DownloadToFileAsync(info.DownloadUrl!, dest, progress, form.Cts.Token);
+                Logger.Info($"Update downloaded ({total} bytes); verifying checksum…");
+                SelfUpdater.VerifySha256(dest, info.Sha256);
+                Logger.Info("Checksum OK; starting the install…");
+                PostToUi(() => form.SetInstalling());
+
+                if (isSetup)
+                {
+                    // Give an in-flight job a chance to finish before the installer
+                    // force-stops the connector (it does the same itself, but a
+                    // graceful exit keeps the logs and state.db clean).
+                    if (!await WaitForIdleAsync(form.Cts.Token, TimeSpan.FromMinutes(15)))
+                    {
+                        throw new TimeoutException("A print job did not finish within 15 minutes.");
+                    }
+
+                    if (!SelfUpdater.RunSetupInstaller(dest))
+                    {
+                        PostToUi(() =>
+                        {
+                            _updateBusy = false;
+                            CloseProgressForm();
+                            _tray.ShowBalloonTip(
+                                8000, Program.AppTitle,
+                                "अपडेट रद्द कर दिया गया — दोबारा करने के लिए सूचना पर फिर क्लिक करो।\n" +
+                                "(Update cancelled — click the notification again to retry.)",
+                                ToolTipIcon.Info);
+                        });
+                        return;
+                    }
+
+                    Logger.Info("Installer launched; exiting so the files can be replaced.");
+                    PostToUi(ExitForUpdate);
+                    return;
+                }
+
+                // Portable build: swap the exe and restart via the cmd helper.
+                SelfUpdater.InstallPortable(dest);
+                PostToUi(ExitForUpdate);
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.Info("Update download cancelled by the user.");
+                PostToUi(() =>
+                {
+                    _updateBusy = false;
+                    CloseProgressForm();
+                });
+            }
+            catch (TimeoutException)
+            {
+                Logger.Warn("Update postponed: a print job did not finish within 15 minutes.");
+                PostToUi(() =>
+                {
+                    _updateBusy = false;
+                    _updateDeferred = false;
+                    CloseProgressForm();
+                    _tray.ShowBalloonTip(
+                        10000, Program.AppTitle,
+                        "प्रिंट अभी भी चल रहा है — अपडेट रुक गया। बाद में फिर कोशिश करो।\n" +
+                        "(The print job kept running — the update was paused. Try again later.)",
+                        ToolTipIcon.Info);
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Self-update failed.", ex);
+                FailUpdate("अपडेट नहीं हो पाया — इंटरनेट देखो और दोबारा कोशिश करो।", ex);
+            }
+        });
+    }
+
+    /// <summary>Waits until no job is printing (checked from a background thread).</summary>
+    private async Task<bool> WaitForIdleAsync(CancellationToken ct, TimeSpan maxWait)
+    {
+        var deadline = DateTime.UtcNow + maxWait;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!IsJobRunning(_worker?.Status.State ?? WorkerState.Waiting)) return true;
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+
+        return !IsJobRunning(_worker?.Status.State ?? WorkerState.Waiting);
+    }
+
+    /// <summary>Tears down the progress window, reports the failure and re-arms the update.</summary>
+    private void FailUpdate(string hindiMessage, Exception ex)
+    {
+        Logger.Error("Update step failed.", ex);
+        PostToUi(() =>
+        {
+            _updateBusy = false;
+            _updateDeferred = false;
+            CloseProgressForm();
+            _tray.ShowBalloonTip(
+                10000, Program.AppTitle,
+                hindiMessage + "\n(Update failed — try again after checking the internet.)",
+                ToolTipIcon.Error);
+        });
+    }
+
+    private void CloseProgressForm()
+    {
+        try { _progressForm?.Close(); }
+        catch { /* already closing */ }
+        _progressForm = null;
+    }
+
+    /// <summary>Exits so the installer can replace files; it restarts the connector.</summary>
+    private void ExitForUpdate() => Exit();
+
+    /// <summary>Tray menu "Check for Updates": always answers with a clear balloon.</summary>
+    private async Task ManualUpdateCheckAsync()
+    {
+        if (_updater == null || _api == null)
+        {
+            _tray.ShowBalloonTip(
+                6000, Program.AppTitle,
+                "पहले दुकान से पेयर करो — अपडेट पेयरिंग के बाद मिलता है।\n" +
+                "(Pair with your shop first — updates come after pairing.)",
+                ToolTipIcon.Info);
+            return;
+        }
+
+        try
+        {
+            var raised = await _updater.CheckOnceAsync(force: true);
+            if (raised) return; // the update balloon is already on screen
+
+            var info = await _api.GetLatestVersionAsync();
+            _tray.ShowBalloonTip(
+                6000, Program.AppTitle,
+                info == null
+                    ? "सर्वर से बात नहीं हो पाई — इंटरनेट देखो।\n(Could not reach the server — check the internet.)"
+                    : $"आपका ऐप लेटेस्ट वर्जन पर है ✓ (वर्जन {Program.AppVersion})\n(Your app is up to date.)",
+                ToolTipIcon.Info);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Manual update check failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>First run after an update: a short "अपडेट हो गया ✓" confirmation.</summary>
+    private void NotifyIfUpdated()
+    {
+        try
+        {
+            var marker = Path.Combine(Logger.AppDataRoot, "lastVersion.txt");
+            var previous = File.Exists(marker) ? File.ReadAllText(marker).Trim() : string.Empty;
+            File.WriteAllText(marker, Program.AppVersion);
+            if (!string.IsNullOrEmpty(previous) &&
+                !previous.Equals(Program.AppVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                _tray.ShowBalloonTip(
+                    8000, Program.AppTitle,
+                    $"अपडेट हो गया ✓ अब वर्जन {Program.AppVersion} चल रहा है।\n" +
+                    $"(Update done — now running version {Program.AppVersion}.)",
+                    ToolTipIcon.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug($"Version marker skipped: {ex.Message}");
         }
     }
 

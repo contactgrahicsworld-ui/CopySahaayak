@@ -127,6 +127,33 @@ BASE_DL="https://github.com/$REPO/releases/download/$TAG"
 verify_asset "DesktopSahaayak-Setup.exe" "$BASE_DL/DesktopSahaayak-Setup.exe"
 verify_asset "DesktopSahaayak-portable.exe" "$BASE_DL/DesktopSahaayak-portable.exe"
 SETUP_SHA=$(sha256sum "/tmp/rel-check-1-DesktopSahaayak-Setup.exe" | awk '{print $1}')
+SETUP_SIZE=$(stat -c %s "/tmp/rel-check-1-DesktopSahaayak-Setup.exe")
+
+# --- 4b. pin sha256 + size into connector-version.ts (self-update integrity) -----
+# The connector downloads /api/downloads/connector, checks this sha256 and refuses
+# to run a tampered file — so the value must come from the CI-verified asset.
+step "Pinning setup sha256 + size into src/lib/connector-version.ts"
+python3 - <<PYEOF
+import re
+path = "$ROOT/src/lib/connector-version.ts"
+src = open(path).read()
+src = re.sub(r"export const CONNECTOR_SETUP_SHA256 = '.*'",
+             "export const CONNECTOR_SETUP_SHA256 = '$SETUP_SHA'", src)
+src = re.sub(r"export const CONNECTOR_SETUP_SIZE_BYTES = \\d+",
+             "export const CONNECTOR_SETUP_SIZE_BYTES = $SETUP_SIZE", src)
+open(path, "w").write(src)
+PYEOF
+grep -n "CONNECTOR_SETUP" "$ROOT/src/lib/connector-version.ts"
+cd "$ROOT"
+if [[ -n "$(git status --porcelain src/lib/connector-version.ts)" ]]; then
+  git add src/lib/connector-version.ts
+  git commit -m "Pin release $VERSION setup sha256+size for connector self-update"
+  git push origin main
+  SHA=$(git rev-parse HEAD)
+  echo "    pinned sha256=$SETUP_SHA size=$SETUP_SIZE (commit $SHA)"
+else
+  echo "    connector-version.ts unchanged (already pinned)"
+fi
 
 # --- 5. Vercel production deploy ------------------------------------------------
 step "Triggering Vercel production deployment"
@@ -158,6 +185,14 @@ if [[ "$LIVE_VERSION" != "$VERSION" ]]; then
   exit 1
 fi
 echo "    version endpoint: $LIVE_VERSION ✓"
+
+LIVE_JSON=$(curl -sS "$SITE/api/downloads/connector/version")
+LIVE_SHA_FIELD=$(printf '%s' "$LIVE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('sha256') or '')")
+if [[ "$LIVE_SHA_FIELD" != "$SETUP_SHA" ]]; then
+  echo "ERROR: version endpoint sha256 field is '$LIVE_SHA_FIELD', expected '$SETUP_SHA'" >&2
+  exit 1
+fi
+echo "    version endpoint advertises the verified sha256 ✓"
 
 curl -sSL -o /tmp/live-setup-pub.exe "$SITE/api/downloads/connector"
 LIVE_SHA=$(sha256sum /tmp/live-setup-pub.exe | awk '{print $1}')

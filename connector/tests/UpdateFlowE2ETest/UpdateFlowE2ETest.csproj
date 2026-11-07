@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reuses the REAL production HTTP + update code end-to-end. -->
+    <Compile Include="../../PrintSahayakConnector/Core/SelfUpdater.cs" />
+    <Compile Include="../../PrintSahayakConnector/Core/Logger.cs" />
+    <Compile Include="../../PrintSahayakConnector/Core/VersionComparer.cs" />
+    <Compile Include="../../PrintSahayakConnector/Api/ApiClient.cs" />
+    <Compile Include="../../PrintSahayakConnector/Api/Models.cs" />
+  </ItemGroup>
+
+</Project>

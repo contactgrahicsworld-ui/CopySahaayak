@@ -45,6 +45,9 @@ SetCompressor /SOLID lzma
 Name "${PRODUCT_NAME}"
 OutFile "DesktopSahaayak-Setup.exe"
 InstallDir "$PROGRAMFILES64\PrintSahayak"
+; Remember a previously chosen install dir so a silent (/S) self-update lands in
+; the same folder the shop originally picked (key written at the end of Section).
+InstallDirRegKey HKLM "${PRODUCT_UNINST_KEY}" "InstallLocation"
 ShowInstDetails show
 ShowUnInstDetails nevershow
 
@@ -143,6 +146,16 @@ Section "Install" SecInstall
   DeleteRegValue HKCU "${RUN_KEY}" "${LEGACY_RUN_VALUE}"
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+  ; ---------------------------------------------------------------------------
+  ; After a SILENT (/S) self-update the connector was closed by this installer
+  ; (taskkill above), so start it again for the shop automatically. Interactive
+  ; installs instead use the Finish page "Start now" checkbox.
+  ; ---------------------------------------------------------------------------
+  IfSilent 0 skip_silent_autostart
+    Exec '"$INSTDIR\${PRODUCT_EXE}"'
+    DetailPrint "${PRODUCT_NAME} updated and restarted."
+  skip_silent_autostart:
 SectionEnd
 
 ; ---------------------------------------------------------------------------
