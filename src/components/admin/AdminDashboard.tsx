@@ -870,6 +870,7 @@ function ReportsTab() {
   const [days, setDays] = useState('30')
   const [groupBy, setGroupBy] = useState('day')
   const [loading, setLoading] = useState(true)
+  const [backupRange, setBackupRange] = useState('month')
 
   useEffect(() => {
     let dead = false
@@ -885,8 +886,34 @@ function ReportsTab() {
   if (!data) return <CenterSpinner />
   const max = Math.max(1, ...data.series.map((d) => d.revenuePaise))
   const periodLabel = groupBy === 'day' ? 'day' : groupBy === 'week' ? 'week' : 'month'
+  const backupLabel = backupRange === 'week' ? 'यह हफ़्ता (7 दिन)' : backupRange === 'month' ? 'यह महीना (30 दिन)' : 'पूरा डेटा (All time)'
   return (
     <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2"><Download className="h-4 w-4" aria-hidden /> डेटा बैकअप — Excel डाउनलोड</CardTitle>
+          <CardDescription>
+            अपना पूरा डेटा ख़ुद डाउनलोड करें — मोबाइल या PC, दोनों पर चलता है। फ़ाइल में Orders, Items, Payments और Summary
+            (कुल कमाई, B/W व Colour कमाई, पेज, कॉपियाँ, पेंडिंग पेमेंट) सब कुछ होता है। बैकअप मैन्युअल है — सिर्फ़ आप डाउनलोड करते हैं, कोई अपने आप मेल नहीं जाता।
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-2">
+          <Select value={backupRange} onValueChange={setBackupRange}>
+            <SelectTrigger className="w-52" aria-label="बैकअप अवधि"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">यह हफ़्ता (पिछले 7 दिन)</SelectItem>
+              <SelectItem value="month">यह महीना (पिछले 30 दिन)</SelectItem>
+              <SelectItem value="all">पूरा डेटा (All time)</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button asChild>
+            <a href={`/api/admin/backup?range=${backupRange}`} download aria-label={`${backupLabel} का बैकअप डाउनलोड करें`}>
+              <Download className="h-4 w-4 mr-1.5" aria-hidden /> बैकअप डाउनलोड करें ({backupLabel})
+            </a>
+          </Button>
+          <span className="text-xs text-muted-foreground">.xlsx फ़ाइल सीधे आपके डिवाइस में सेव होगी</span>
+        </CardContent>
+      </Card>
       <div className="flex flex-wrap items-center gap-2">
         <Select value={days} onValueChange={setDays}>
           <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>

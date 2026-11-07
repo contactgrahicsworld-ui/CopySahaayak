@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, Store, BadgeCheck, Layers, ScrollText, Settings, LogOut, Loader2,
-  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2, AtSign, Undo2,
+  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2, AtSign, Undo2, Download,
 } from 'lucide-react'
 
 export function SuperDashboard({ user }: { user: { name: string; email: string } }) {
@@ -195,6 +195,8 @@ function ShopsTab() {
   const [delConfirm, setDelConfirm] = useState('')
   const [planFree, setPlanFree] = useState<ShopRow | null>(null)
   const [planBusy, setPlanBusy] = useState(false)
+  const [backupRange, setBackupRange] = useState('month')
+  const backupLabel = backupRange === 'week' ? 'यह हफ़्ता (7 दिन)' : backupRange === 'month' ? 'यह महीना (30 दिन)' : 'पूरा डेटा'
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/super/shops?q=${encodeURIComponent(q)}`, { cache: 'no-store' })
@@ -293,6 +295,21 @@ function ShopsTab() {
         <Input placeholder="Search shops" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:max-w-xs" />
         <Button variant="outline" size="sm" onClick={load} aria-label="Refresh"><RefreshCw className="h-4 w-4" aria-hidden /></Button>
         <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" aria-hidden /> Onboard shop</Button>
+        <div className="flex flex-wrap gap-2 items-center sm:ml-auto">
+          <Select value={backupRange} onValueChange={setBackupRange}>
+            <SelectTrigger className="w-44" aria-label="बैकअप अवधि"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">यह हफ़्ता (7 दिन)</SelectItem>
+              <SelectItem value="month">यह महीना (30 दिन)</SelectItem>
+              <SelectItem value="all">पूरा डेटा</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" asChild variant="outline">
+            <a href={`/api/admin/backup?range=${backupRange}&platform=1`} download aria-label="सभी shops का platform backup डाउनलोड करें">
+              <Download className="h-4 w-4 mr-1.5" aria-hidden /> Platform backup ({backupLabel})
+            </a>
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -320,6 +337,9 @@ function ShopsTab() {
                     <Button size="sm" onClick={() => act(s.id, 'ACTIVATE')}><ShieldCheck className="h-3.5 w-3.5 mr-1" aria-hidden />Activate</Button>
                   )}
                   <Button size="sm" variant="outline" onClick={() => act(s.id, 'RESET_PASSWORD')}><KeyRound className="h-3.5 w-3.5 mr-1" aria-hidden />Reset pwd</Button>
+                  <Button size="sm" variant="outline" asChild aria-label={`${s.name} का backup डाउनलोड करें`}>
+                    <a href={`/api/admin/backup?range=${backupRange}&shopId=${s.id}`} download><Download className="h-3.5 w-3.5 mr-1" aria-hidden />Backup</a>
+                  </Button>
                   {s.subscription?.plan?.code && s.subscription.plan.code !== 'FREE' && (
                     <Button size="sm" variant="outline" aria-label={`Move ${s.slug} to the Free plan`} onClick={() => setPlanFree(s)}><Undo2 className="h-3.5 w-3.5 mr-1" aria-hidden />Plan → Free</Button>
                   )}

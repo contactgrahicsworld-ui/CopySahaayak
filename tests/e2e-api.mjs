@@ -438,6 +438,72 @@ async function main() {
     check('shop admin blocked from super APIs', denied.res.status === 403)
   }
 
+  // ---------- 9b. Manual backup download (no auto-email; admin/super only) ----------
+  console.log('[9b] Manual data backup (Excel, mobile/PC)')
+  {
+    const noAuth = await req('/api/admin/backup?range=week')
+    check('backup without auth rejected 401', noAuth.res.status === 401, `got ${noAuth.res.status}`)
+
+    const badRange = await req('/api/admin/backup?range=yesterday', { jar: jarA })
+    check('invalid range rejected 400', badRange.res.status === 400, `got ${badRange.res.status}`)
+
+    const own = await req('/api/admin/backup?range=week', { jar: jarA, raw: true })
+    check('shop admin backup 200', own.res.status === 200, `got ${own.res.status}`)
+    check('backup is a real xlsx (PK zip magic)', own.buf.subarray(0, 2).toString() === 'PK' && own.buf.length > 500, `bytes=${own.buf.length}`)
+    const cd = own.res.headers.get('content-disposition') || ''
+    check('backup filename carries own shop slug', cd.includes(`e2e-a-${RUN}`), cd)
+    check('backup served as attachment with no-store', cd.startsWith('attachment') && (own.res.headers.get('cache-control') || '').includes('no-store'), cd)
+
+    // IDOR: ?shopId= is ignored for shop admins — they always get their own shop
+    const idor = await req('/api/admin/backup?range=week&shopId=not-a-real-shop-id', { jar: jarA, raw: true })
+    check('shop admin shopId param ignored (own shop returned)', idor.res.status === 200 && (idor.res.headers.get('content-disposition') || '').includes(`e2e-a-${RUN}`), idor.res.headers.get('content-disposition') || '')
+
+    const superNoArgs = await req('/api/admin/backup?range=week', { jar: jarS })
+    check('super admin without shopId/platform rejected 400', superNoArgs.res.status === 400, `got ${superNoArgs.res.status}`)
+
+    // Super admin: platform workbook with all shops + totals
+    const platform = await req('/api/admin/backup?range=month&platform=1', { jar: jarS, raw: true })
+    check('platform backup 200', platform.res.status === 200, `got ${platform.res.status}`)
+    if (platform.res.status === 200) {
+      const ExcelJS = (await import('exceljs')).default
+      const wb = new ExcelJS.Workbook()
+      await wb.xlsx.load(platform.buf)
+      const sheetNames = wb.worksheets.map((w) => w.name)
+      check('platform workbook has All Shops + Info sheets', sheetNames.includes('All Shops') && sheetNames.includes('Info'), JSON.stringify(sheetNames))
+      const ws = wb.getWorksheet('All Shops')
+      const shopNames = []
+      ws.eachRow((row, i) => { if (i > 1 && row.getCell(1).value) shopNames.push(String(row.getCell(1).value)) })
+      check('platform backup lists both e2e shops', shopNames.some((n) => n.includes('A')) && shopNames.some((n) => n.includes('B')), JSON.stringify(shopNames))
+      check('platform backup has TOTAL row', shopNames.some((n) => n === 'TOTAL'))
+    }
+
+    // Super admin: single-shop backup by id (resolved from the shops list)
+    const shops = await req('/api/super/shops', { jar: jarS })
+    const shopA = shops.data?.shops?.find((s) => s.slug === `e2e-a-${RUN}`)
+    check('super shops list resolves shop A', !!shopA)
+    if (shopA) {
+      const one = await req(`/api/admin/backup?range=all&shopId=${shopA.id}`, { jar: jarS, raw: true })
+      check('super admin per-shop backup 200', one.res.status === 200, `got ${one.res.status}`)
+      if (one.res.status === 200) {
+        const ExcelJS = (await import('exceljs')).default
+        const wb = new ExcelJS.Workbook()
+        await wb.xlsx.load(one.buf)
+        const sheets = wb.worksheets.map((w) => w.name)
+        check('shop backup has Orders/Items/Payments/Summary sheets', ['Orders', 'Items', 'Payments', 'Summary'].every((s) => sheets.includes(s)), JSON.stringify(sheets))
+        const sum = wb.getWorksheet('Summary')
+        const labels = []
+        sum.eachRow((row) => { const v = row.getCell(1).value; if (v) labels.push(String(v)) })
+        check('summary shows revenue breakdown (B/W + Colour + pages + copies)', ['Total revenue ₹', 'B/W revenue ₹', 'Colour revenue ₹', 'Pages total', 'Copies total'].every((l) => labels.includes(l)), JSON.stringify(labels))
+      }
+    }
+
+    // Customer session must never reach backups
+    const cust = new Jar()
+    await req(`/api/shops/${SHOP_A.slug}/session`, { method: 'POST', body: {}, jar: cust })
+    const custBackup = await req('/api/admin/backup?range=week', { jar: cust })
+    check('customer session blocked from backup', custBackup.res.status === 401, `got ${custBackup.res.status}`)
+  }
+
   // ---------- 11. Forgot password (mock mail transport) ----------
   console.log('[11] Forgot password flow')
   const INTERNAL = { 'x-internal-secret': process.env.APP_SECRET || '' }

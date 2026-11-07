@@ -35,7 +35,8 @@ describe('buildUpiPayload', () => {
   test('contains VPA, amount, order ref, INR', () => {
     const p = buildUpiPayload({ vpa: 'shop@okhdfcbank', payeeName: 'Sharma Digital', amountPaise: 4250, txnRef: 'PC-2602-ABCDE', note: 'order PC-2602-ABCDE' })
     assert.ok(p.startsWith('upi://pay?'))
-    assert.ok(p.includes('pa=shop%40okhdfcbank'))
+    // "@" stays literal — most UPI apps (PhonePe/Paytm/bank apps) do NOT decode %40
+    assert.ok(p.includes('pa=shop@okhdfcbank'))
     assert.ok(p.includes('am=42.50'))
     assert.ok(p.includes('tr=PC2602ABCDE'))
     assert.ok(p.includes('cu=INR'))
