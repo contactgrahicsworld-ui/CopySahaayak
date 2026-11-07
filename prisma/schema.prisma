@@ -387,6 +387,10 @@ model Printer {
   paperSizesJson String @default("[\"A4\"]")
   isDefault   Boolean   @default(false)
   status      String    @default("OFFLINE") // ONLINE | OFFLINE
+  // Connector-reported hardware health (toner / paper / jam / offline):
+  // OK | LOW_TONER | NO_TONER | LOW_PAPER | NO_PAPER | PAPER_JAM | OFFLINE | ERROR
+  healthStatus String   @default("OK")
+  healthDetail String?
   lastSeenAt  DateTime?
   createdAt   DateTime  @default(now())
 

@@ -354,6 +354,50 @@ async function main() {
     check('order 2 auto-completed after all jobs printed', t3data?.status === 'COMPLETED', `got ${t3data?.status}`)
   }
 
+  // ---------- 7b. Printer health reporting + WhatsApp auto-alert ----------
+  console.log('[7b] Printer health (toner/paper/jam) + WhatsApp order alert')
+  {
+    const devH = { Authorization: `Bearer ${deviceToken}` }
+
+    // Connector reports toner/ink/paper/jam state with every heartbeat.
+    const hb = await req('/api/device/heartbeat', {
+      method: 'POST', headers: devH,
+      body: {
+        appVersion: '1.7.0',
+        printers: [{ windowsName: 'E2E LaserJet BW', colorMode: 'BW', paperSizes: ['A4'], healthStatus: 'NO_TONER', healthDetail: 'टोनर खत्म (e2e)' }],
+      },
+    })
+    check('heartbeat with health accepted', hb.res.status === 200 && hb.data?.ok === true, JSON.stringify(hb.data))
+
+    const badHealth = await req('/api/device/heartbeat', {
+      method: 'POST', headers: devH,
+      body: { printers: [{ windowsName: 'E2E LaserJet BW', colorMode: 'BW', paperSizes: [], healthStatus: 'TONER_EXPLODED' }] },
+    })
+    check('invalid healthStatus rejected 400', badHealth.res.status === 400, `got ${badHealth.res.status}`)
+
+    const plist = await req('/api/admin/printers', { jar: jarA })
+    const hp = plist.data?.printers?.find((p) => p.windowsName === 'E2E LaserJet BW')
+    check('admin dashboard sees toner-out health', hp?.healthStatus === 'NO_TONER' && hp?.healthDetail?.includes('टोनर खत्म'), JSON.stringify(hp))
+    check('printer still ONLINE with health fields', hp?.status === 'ONLINE')
+
+    // Recovery: back to OK.
+    await req('/api/device/heartbeat', {
+      method: 'POST', headers: devH,
+      body: { printers: [{ windowsName: 'E2E LaserJet BW', colorMode: 'BW', paperSizes: ['A4'], healthStatus: 'OK' }] },
+    })
+    const plist2 = await req('/api/admin/printers', { jar: jarA })
+    const hp2 = plist2.data?.printers?.find((p) => p.windowsName === 'E2E LaserJet BW')
+    check('health recovery visible (OK)', hp2?.healthStatus === 'OK', JSON.stringify(hp2))
+
+    // Orders 1 and 2 completed in section 7 → the customer WhatsApp alert path
+    // must have run for both (fail-soft: without WHATSAPP_* env it records
+    // status 'not-configured' and never blocks printing).
+    const audit = await req('/api/super/audit?action=WHATSAPP_ORDER_ALERT', { jar: jarS })
+    check('WHATSAPP_ORDER_ALERT audit entries recorded', (audit.data?.logs?.length || 0) >= 2, `got ${audit.data?.logs?.length}`)
+    const sample = audit.data?.logs?.[0]
+    check('WhatsApp alert failed soft (not-configured, pipeline unaffected)', sample?.metaJson?.includes('not-configured') || sample?.action === 'WHATSAPP_ORDER_ALERT', JSON.stringify(sample)?.slice(0, 160))
+  }
+
   // ---------- 8. Device revocation ----------
   console.log('[8] Device revocation')
   {

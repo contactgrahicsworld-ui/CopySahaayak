@@ -32,6 +32,23 @@ public sealed record WorkerStatus(
     DateTime? LastCheckUtc,
     int BackoffSeconds);
 
+/// <summary>
+/// What the status window shows in its “अब क्या छप रहा है” (now printing) card:
+/// the claimed job's identity plus a rendered preview of the first page.
+/// <see cref="PreviewPng"/> may be null when the document type has no renderer.
+/// </summary>
+public sealed record NowPrinting(
+    string JobId,
+    string? OrderNumber,
+    string FileName,
+    int Pages,
+    int Copies,
+    string ColorMode,
+    string? PaperSize,
+    bool Duplex,
+    string PrinterName,
+    byte[]? PreviewPng);
+
 /// <summary>Thrown when the server reports this device as revoked.</summary>
 public sealed class DeviceRevokedException : Exception
 {
@@ -71,12 +88,18 @@ public sealed class JobWorker : IDisposable
     private int _backoffSeconds;
     private DateTime? _lastHeartbeatUtc;
     private DateTime? _lastCheckUtc;
+    // Last reported health per printer — balloons fire only on state CHANGES,
+    // never every 20 s while a problem persists.
+    private readonly Dictionary<string, string> _lastHealth = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Raised (on a worker thread) whenever the status snapshot changes.</summary>
     public event Action<WorkerStatus>? StatusChanged;
 
     /// <summary>Raised (on a worker thread) when the user should be notified via a tray balloon.</summary>
     public event Action<string, BalloonKind>? NotifyUser;
+
+    /// <summary>Raised (on a worker thread) when a job was claimed and is being printed now.</summary>
+    public event Action<NowPrinting>? JobStarted;
 
     /// <summary>Creates a worker for the given store/API pair.</summary>
     public JobWorker(LocalStore store, ApiClient api)
@@ -280,14 +303,58 @@ public sealed class JobWorker : IDisposable
             return;
         }
 
-        var printers = _store.GetPrinters()
-            .Select(mapping => new HeartbeatPrinter(
+        // Zero-manual-work: newly installed physical printers join the mapping by
+        // themselves (colour capability auto-tagged). Printers the owner explicitly
+        // disabled stay disabled (removed list).
+        var saved = _store.GetPrinters();
+        var merged = PrinterDetector.BuildAutoMappings(saved, _store.GetRemovedPrinters());
+        if (merged.Count != saved.Count)
+        {
+            _store.SavePrinters(merged);
+            var known = new HashSet<string>(saved.Select(m => m.WindowsName), StringComparer.OrdinalIgnoreCase);
+            foreach (var added in merged.Where(m => !known.Contains(m.WindowsName)))
+            {
+                NotifyUser?.Invoke(
+                    $"नया प्रिंटर मिला: {added.WindowsName} ({(added.ColorMode == "COLOR" ? "colour" : "black & white")}) — जोड़ लिया ✓\n" +
+                    "(New printer detected and enabled automatically.)",
+                    BalloonKind.Info);
+            }
+        }
+
+        var printers = new List<HeartbeatPrinter>(merged.Count);
+        foreach (var mapping in merged)
+        {
+            // Toner / paper / jam / offline state straight from Windows (WMI).
+            var health = PrinterHealthReader.Read(mapping.WindowsName);
+            printers.Add(new HeartbeatPrinter(
                 mapping.WindowsName,
                 mapping.ColorMode,
                 string.IsNullOrWhiteSpace(mapping.DefaultPaperSize)
                     ? new List<string>()
-                    : new List<string> { mapping.DefaultPaperSize }))
-            .ToList();
+                    : new List<string> { mapping.DefaultPaperSize },
+                health.Status,
+                health.Detail));
+
+            // Notify only when the health state CHANGES (spam-free).
+            _lastHealth.TryGetValue(mapping.WindowsName, out var previous);
+            if (!string.Equals(previous, health.Status, StringComparison.Ordinal))
+            {
+                if (health.Status != "OK")
+                {
+                    NotifyUser?.Invoke(
+                        $"⚠ {mapping.WindowsName}: {health.Detail ?? health.Status}",
+                        BalloonKind.Error);
+                }
+                else if (previous is not null and not "OK")
+                {
+                    NotifyUser?.Invoke(
+                        $"✓ {mapping.WindowsName} फिर ठीक है — printing जारी।\n(Back to normal — printing continues.)",
+                        BalloonKind.Info);
+                }
+
+                _lastHealth[mapping.WindowsName] = health.Status;
+            }
+        }
 
         var response = await api.HeartbeatAsync(new HeartbeatRequest(printers, Program.AppVersion), ct);
         lock (_statusGate) { _lastHeartbeatUtc = DateTime.UtcNow; }
@@ -324,6 +391,36 @@ public sealed class JobWorker : IDisposable
 
             var target = PrinterResolver.Resolve(job, _store);
             Logger.Info($"Printing job {job.Id} on '{target.Name}' ({target.Source}).");
+
+            // "अब क्या छप रहा है" — push the job identity + a first-page preview to
+            // the status window BEFORE printing starts. Purely informational: any
+            // preview failure must never affect the actual print.
+            byte[]? previewPng = null;
+            var previewPages = 0;
+            try
+            {
+                previewPng = RenderPreviewPng(tempFile, job.Document.MimeType);
+                previewPages = CountPages(tempFile, job.Document.MimeType);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"Preview skipped: {ex.Message}");
+            }
+
+            JobStarted?.Invoke(new NowPrinting(
+                job.Id,
+                job.OrderNumber,
+                job.Document.FileName,
+                previewPages,
+                Math.Max(1, job.PrintSettings?.Copies ?? 1),
+                job.PrintSettings?.ColorMode ?? "ANY",
+                job.PrintSettings?.PaperSize,
+                job.PrintSettings?.Duplex ?? false,
+                target.Name,
+                previewPng));
+            NotifyUser?.Invoke(
+                $"नया ऑर्डर {job.OrderNumber ?? job.Id} छपने शुरू — {target.Name}\n(New job started printing.)",
+                BalloonKind.Info);
 
             SetStatus(WorkerState.Printing, $"Printing {job.OrderNumber} on {target.Name}…");
             var executor = new PrintJobExecutor();
@@ -430,6 +527,56 @@ public sealed class JobWorker : IDisposable
     private async Task WaitForNextIterationAsync(TimeSpan timeout, CancellationToken ct)
     {
         await _wake.WaitAsync(timeout, ct);
+    }
+
+    /// <summary>
+    /// Renders the first page of a document into a compact PNG for the status
+    /// window preview (PDF via pdfium at ~110 DPI, images via a thumbnail).
+    /// Returns null for document types without a renderer.
+    /// </summary>
+    private static byte[]? RenderPreviewPng(string filePath, string? mimeType)
+    {
+        var mime = (mimeType ?? string.Empty).ToLowerInvariant();
+        using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        if (mime.Contains("pdf"))
+        {
+            using var skBitmap = PDFtoImage.Conversion.ToImage(
+                stream,
+                0,
+                password: null,
+                options: new PDFtoImage.RenderOptions(Dpi: 110));
+            using var image = SkiaSharp.SKImage.FromBitmap(skBitmap);
+            using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 80);
+            return data.ToArray();
+        }
+
+        if (mime.StartsWith("image/"))
+        {
+            using var image = System.Drawing.Image.FromStream(stream);
+            var width = Math.Max(1, Math.Min(420, image.Width));
+            var height = Math.Max(1, image.Height * width / Math.Max(1, image.Width));
+            using var thumb = image.GetThumbnailImage(width, height, () => false, IntPtr.Zero);
+            using var bitmap = new System.Drawing.Bitmap(thumb);
+            using var wrapper = new MemoryStream();
+            bitmap.Save(wrapper, System.Drawing.Imaging.ImageFormat.Png);
+            return wrapper.ToArray();
+        }
+
+        return null;
+    }
+
+    /// <summary>Number of pages that will be printed (after the requested range).</summary>
+    private static int CountPages(string filePath, string? mimeType)
+    {
+        var mime = (mimeType ?? string.Empty).ToLowerInvariant();
+        if (mime.Contains("pdf"))
+        {
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return PDFtoImage.Conversion.GetPageCount(stream);
+        }
+
+        return mime.StartsWith("image/") ? 1 : 0;
     }
 
     private void SetStatus(WorkerState state, string detail, int backoffSeconds = 0)

@@ -78,6 +78,11 @@ export const heartbeatSchema = z.object({
         windowsName: z.string().trim().min(1).max(120),
         colorMode: z.enum(['BW', 'COLOR', 'ANY']),
         paperSizes: z.array(z.string().trim().min(1).max(12)).max(20),
+        // Connector-reported hardware health (WMI Win32_Printer). Absent = OK.
+        healthStatus: z
+          .enum(['OK', 'LOW_TONER', 'NO_TONER', 'LOW_PAPER', 'NO_PAPER', 'PAPER_JAM', 'OFFLINE', 'ERROR'])
+          .optional(),
+        healthDetail: z.string().trim().max(160).optional(),
       })
     )
     .max(20),

@@ -1,5 +1,6 @@
 using System.Data;
 using PrintSahayakConnector.Core;
+using PrintSahayakConnector.Printing;
 
 namespace PrintSahayakConnector.UI;
 
@@ -259,9 +260,15 @@ public sealed class PrinterMappingForm : Form
             }
             else
             {
-                row.Cells[ColEnabled].Value = false;
-                row.Cells[ColColor].Value = "BW";
-                row.Cells[ColPaper].Value = DefaultPaperValue;
+                // Brand-new (or never saved) physical printer: auto-enabled with the
+                // capability-derived colour tag — install-and-it-just-works.
+                row.Cells[ColEnabled].Value = !PrinterDetector.IsVirtual(name);
+                row.Cells[ColColor].Value = PrinterDetector.IsVirtual(name)
+                    ? "BW"
+                    : PrinterDetector.SupportsColor(name) ? "COLOR" : "BW";
+                row.Cells[ColPaper].Value = PrinterDetector.DefaultPaperSize(name) is { Length: > 0 } paper
+                    ? paper
+                    : DefaultPaperValue;
             }
 
             row.Cells[ColPrinter].Value = name;
@@ -351,17 +358,36 @@ public sealed class PrinterMappingForm : Form
         // grid has not committed yet) — otherwise the OLD value would be saved.
         _grid.EndEdit();
 
+        var previouslySaved = _store.GetPrinters()
+            .Select(m => m.WindowsName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var mappings = new List<PrinterMapping>();
+        var untickedPreviouslySaved = new List<string>();
         foreach (DataGridViewRow row in _grid.Rows)
         {
             if (row.Cells[ColPrinter].Value is not string name || name.Length == 0) continue;
-            if (row.Cells[ColEnabled].Value is not true) continue;
+            if (row.Cells[ColEnabled].Value is not true)
+            {
+                // The owner deliberately disabled a printer that was mapped before —
+                // remember it so auto-detection never silently re-adds it.
+                if (previouslySaved.Contains(name)) untickedPreviouslySaved.Add(name);
+                continue;
+            }
 
             mappings.Add(new PrinterMapping(
                 name,
                 NormalizeColor(row.Cells[ColColor].Value as string),
                 row.Cells[ColPaper].Value as string ?? DefaultPaperValue));
         }
+
+        // Printers removed from Windows entirely should also leave the removed set
+        // (a reinstalled printer should come back automatically).
+        var installedNow = EnumerateInstalledPrinters().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var removed = _store.GetRemovedPrinters()
+            .Where(name => untickedPreviouslySaved.Contains(name) || !installedNow.Contains(name))
+            .Concat(untickedPreviouslySaved)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         if (mappings.Count == 0)
         {
@@ -377,7 +403,8 @@ public sealed class PrinterMappingForm : Form
         try
         {
             _store.SavePrinters(mappings);
-            Logger.Info($"Printer mapping saved ({mappings.Count} printer(s): {string.Join(", ", mappings.Select(m => m.WindowsName))}).");
+            _store.SaveRemovedPrinters(removed);
+            Logger.Info($"Printer mapping saved ({mappings.Count} printer(s): {string.Join(", ", mappings.Select(m => m.WindowsName))}); {removed.Count} explicitly disabled.");
         }
         catch (Exception ex)
         {

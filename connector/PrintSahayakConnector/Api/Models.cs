@@ -19,7 +19,12 @@ public sealed record ServerPrinter(string Id, string WindowsName, string ColorMo
 public sealed record MeResponse(DeviceInfo Device, ShopInfo Shop, List<ServerPrinter>? Printers);
 
 /// <summary>One printer entry in the heartbeat payload.</summary>
-public sealed record HeartbeatPrinter(string WindowsName, string ColorMode, List<string> PaperSizes);
+public sealed record HeartbeatPrinter(
+    string WindowsName,
+    string ColorMode,
+    List<string> PaperSizes,
+    string? HealthStatus = null,
+    string? HealthDetail = null);
 
 /// <summary>Request body for <c>POST /api/device/heartbeat</c> (upserts the device's printers).</summary>
 public sealed record HeartbeatRequest(List<HeartbeatPrinter> Printers, string AppVersion);

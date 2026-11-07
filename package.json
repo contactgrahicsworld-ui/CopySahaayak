@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "next build && (cp -r .next/static .next/standalone/.next/ 2>/dev/null || true) && (cp -r public .next/standalone/ 2>/dev/null || true)",
+    "build": "bash scripts/prebuild-schema.sh && next build && (cp -r .next/static .next/standalone/.next/ 2>/dev/null || true) && (cp -r public .next/standalone/ 2>/dev/null || true)",
     "start": "node .next/standalone/server.js",
     "lint": "eslint .",
     "db:push": "prisma db push --accept-data-loss",

@@ -1,5 +1,6 @@
 using PrintSahayakConnector.Api;
 using PrintSahayakConnector.Core;
+using PrintSahayakConnector.Printing;
 
 namespace PrintSahayakConnector.UI;
 
@@ -105,6 +106,7 @@ public sealed class TrayContext : ApplicationContext
         _worker = new JobWorker(_store, api);
         _worker.StatusChanged += OnWorkerStatusChanged;
         _worker.NotifyUser += OnWorkerNotify;
+        _worker.JobStarted += OnJobStarted;
         _worker.Start();
         StartUpdateChecker(api);
         Logger.Info($"Worker started (device {_store.DeviceId}, shop {_store.ShopName}).");
@@ -130,6 +132,11 @@ public sealed class TrayContext : ApplicationContext
 
     private static bool IsJobRunning(WorkerState state) =>
         state is WorkerState.Downloading or WorkerState.Printing or WorkerState.Reporting;
+
+    private void OnJobStarted(NowPrinting now)
+    {
+        PostToUi(() => _statusForm?.UpdateNowPrinting(now));
+    }
 
     private void OnWorkerNotify(string message, BalloonKind kind)
     {
@@ -189,6 +196,26 @@ public sealed class TrayContext : ApplicationContext
         _pairingForm = null;
         if (form is { IsDisposed: false }) form.Close();
 
+        // Zero-manual-work: detect this PC's physical printers BEFORE the first
+        // heartbeat so the shop can receive jobs without any settings visit.
+        var autoMapped = 0;
+        try
+        {
+            var before = _store.GetPrinters().Count;
+            var merged = PrinterDetector.BuildAutoMappings(_store.GetPrinters(), _store.GetRemovedPrinters());
+            if (merged.Count != before)
+            {
+                _store.SavePrinters(merged);
+            }
+
+            autoMapped = merged.Count;
+            Logger.Info($"Auto printer detection after pairing: {autoMapped} physical printer(s) ready.");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Auto printer detection failed — the owner can still map printers manually.", ex);
+        }
+
         if (_worker == null)
         {
             StartWorker();
@@ -202,16 +229,30 @@ public sealed class TrayContext : ApplicationContext
             StartUpdateChecker(api); // re-pair may point at a different server
         }
 
-        _tray.ShowBalloonTip(
-            6000,
-            Program.AppTitle,
-            $"Paired with “{_store.ShopName}”. Now choose your printers.",
-            ToolTipIcon.Info);
-        UpdateTrayText(_worker!.Status);
+        if (autoMapped == 0)
+        {
+            // Nothing physical found (or detection failed) — open the settings so
+            // the owner can connect a printer; jobs cannot print without one.
+            _tray.ShowBalloonTip(
+                8000,
+                Program.AppTitle,
+                "कोई प्रिंटर नहीं मिला — Printer Settings खुल रहा है। पहले Windows में printer जोड़ो।\n" +
+                "(No printer found — Printer Settings is opening. Add one in Windows first.)",
+                ToolTipIcon.Warning);
+            ShowPrinterMapping();
+        }
+        else
+        {
+            _tray.ShowBalloonTip(
+                8000,
+                Program.AppTitle,
+                $"Paired with “{_store.ShopName}” ✓\n" +
+                $"{autoMapped} प्रिंटर अपने आप जुड़ गए — बस, काम छपने लगेगा। बदलना हो तो Printer Settings… में जाओ।\n" +
+                $"({autoMapped} printer(s) auto-connected — nothing else to do.)",
+                ToolTipIcon.Info);
+        }
 
-        // The shop cannot receive a single job until printers are mapped — open the
-        // printer settings right away instead of hoping the user finds the tray menu.
-        ShowPrinterMapping();
+        UpdateTrayText(_worker!.Status);
     }
 
     private void ShowPrinterMapping()

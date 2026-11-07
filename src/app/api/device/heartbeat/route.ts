@@ -27,7 +27,12 @@ export async function POST(req: Request) {
           if (!existing.deviceId || existing.deviceId === device.id) {
             await tx.printer.update({
               where: { id: existing.id },
-              data: { deviceId: device.id, colorMode: p.colorMode, paperSizesJson: JSON.stringify(p.paperSizes), status: 'ONLINE', lastSeenAt: new Date() },
+              data: {
+                deviceId: device.id, colorMode: p.colorMode, paperSizesJson: JSON.stringify(p.paperSizes),
+                status: 'ONLINE', lastSeenAt: new Date(),
+                healthStatus: p.healthStatus ?? 'OK',
+                healthDetail: p.healthDetail ?? null,
+              },
             })
             claimedIds.push(existing.id)
           }
@@ -42,6 +47,8 @@ export async function POST(req: Request) {
               status: 'ONLINE',
               lastSeenAt: new Date(),
               isDefault: false,
+              healthStatus: p.healthStatus ?? 'OK',
+              healthDetail: p.healthDetail ?? null,
             },
           })
           claimedIds.push(created.id)

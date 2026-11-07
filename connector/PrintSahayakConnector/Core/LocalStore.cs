@@ -39,6 +39,12 @@ public sealed class LocalStore
             note         TEXT NOT NULL DEFAULT ''
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS removed_printers (
+            windows_name TEXT PRIMARY KEY,
+            removed_at   TEXT NOT NULL
+        )
+        """,
     };
 
     private const int CompletedJobsRetentionDays = 30;
@@ -157,6 +163,57 @@ public sealed class LocalStore
                     pName.Value = mapping.WindowsName;
                     pColor.Value = mapping.ColorMode;
                     pPaper.Value = mapping.DefaultPaperSize ?? string.Empty;
+                    ins.ExecuteNonQuery();
+                }
+            }
+
+            tx.Commit();
+        }
+    }
+
+    /// <summary>Printers the owner deliberately disabled — auto-detection must never re-add them.</summary>
+    public IReadOnlyList<string> GetRemovedPrinters()
+    {
+        lock (_gate)
+        {
+            var list = new List<string>();
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT windows_name FROM removed_printers ORDER BY windows_name";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                list.Add(reader.GetString(0));
+            }
+
+            return list;
+        }
+    }
+
+    /// <summary>Replaces the removed-printers set (owners' explicit disable choices).</summary>
+    public void SaveRemovedPrinters(IEnumerable<string> names)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var tx = conn.BeginTransaction();
+            using (var del = conn.CreateCommand())
+            {
+                del.Transaction = tx;
+                del.CommandText = "DELETE FROM removed_printers";
+                del.ExecuteNonQuery();
+            }
+
+            using (var ins = conn.CreateCommand())
+            {
+                ins.Transaction = tx;
+                ins.CommandText = "INSERT OR IGNORE INTO removed_printers(windows_name, removed_at) VALUES($n, $at)";
+                var pName = ins.Parameters.Add("$n", SqliteType.Text);
+                var pAt = ins.Parameters.Add("$at", SqliteType.Text);
+                foreach (var name in names)
+                {
+                    pName.Value = name;
+                    pAt.Value = DateTime.UtcNow.ToString("O");
                     ins.ExecuteNonQuery();
                 }
             }

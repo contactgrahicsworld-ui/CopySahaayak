@@ -557,7 +557,20 @@ interface PrinterRow {
   colorMode: string
   isDefault: boolean
   status: string
+  healthStatus?: string
+  healthDetail?: string | null
   lastSeenAt?: string
+}
+
+const HEALTH_BADGES: Record<string, { label: string; cls: string }> = {
+  OK: { label: 'ठीक है ✓', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+  LOW_TONER: { label: 'टोनर/इंक कम है', cls: 'text-amber-700 bg-amber-50 border-amber-200' },
+  NO_TONER: { label: 'टोनर/इंक खत्म', cls: 'text-red-700 bg-red-50 border-red-200' },
+  LOW_PAPER: { label: 'पेपर कम है', cls: 'text-amber-700 bg-amber-50 border-amber-200' },
+  NO_PAPER: { label: 'पेपर खत्म', cls: 'text-red-700 bg-red-50 border-red-200' },
+  PAPER_JAM: { label: 'पेपर जाम', cls: 'text-red-700 bg-red-50 border-red-200' },
+  OFFLINE: { label: 'प्रिंटर ऑफलाइन', cls: 'text-gray-700 bg-gray-100 border-gray-200' },
+  ERROR: { label: 'प्रिंटर समस्या', cls: 'text-red-700 bg-red-50 border-red-200' },
 }
 
 function PrintersTab() {
@@ -706,6 +719,15 @@ function PrintersTab() {
                   <p className="text-xs text-muted-foreground">
                     {p.status} · last seen {p.lastSeenAt ? new Date(p.lastSeenAt).toLocaleString('en-IN') : 'never'}
                   </p>
+                  {(() => {
+                    const badge = HEALTH_BADGES[p.healthStatus || 'OK'] || HEALTH_BADGES.ERROR
+                    const needsAttention = p.healthStatus && p.healthStatus !== 'OK'
+                    return (
+                      <span className={`mt-1 inline-block text-xs font-medium border rounded px-2 py-0.5 ${badge.cls}`}>
+                        {needsAttention ? '⚠ ' : ''}{badge.label}{p.healthDetail ? ` — ${p.healthDetail}` : ''}
+                      </span>
+                    )
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   <Select value={p.colorMode} onValueChange={(v) => updatePrinter(p.id, { colorMode: v })}>

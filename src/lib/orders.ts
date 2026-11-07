@@ -328,7 +328,7 @@ export async function recordPrintEvent(jobId: string, status: 'SPOOLING' | 'COMP
     throw new HttpError(409, 'COMPLETED requires a SPOOLING event first (spooler verification)')
   }
 
-  await retryDb(() =>
+  const orderCompleted = await retryDb(() =>
     db.$transaction(async (tx) => {
     await tx.printEvent.create({
       data: { printJobId: job.id, shopId: job.shopId, deviceId, status, message: message?.slice(0, 480) || null },
@@ -354,9 +354,51 @@ export async function recordPrintEvent(jobId: string, status: 'SPOOLING' | 'COMP
       })
       if (pending === 0) {
         await tx.order.update({ where: { id: job.orderId }, data: { status: 'COMPLETED', completedAt: new Date() } })
+        return true
       }
     }
+    return false
   }, TX))
+
+  // The customer's whole order just finished printing → automatic WhatsApp alert
+  // to the customer's own mobile (WhatsApp Cloud API, pre-approved template).
+  // Fail-soft: a WhatsApp outage must NEVER block or fail the print pipeline —
+  // the connector's tray notification to the shop owner is the other alert path.
+  if (orderCompleted) {
+    await notifyCustomerOrderPrinted(job.orderId)
+  }
+}
+
+/** Best-effort WhatsApp "order printed — collect it" message to the customer. */
+async function notifyCustomerOrderPrinted(orderId: string): Promise<void> {
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: {
+        orderNumber: true, customerPhone: true, customerName: true, shopId: true,
+        shop: { select: { name: true } },
+      },
+    })
+    if (!order || !order.customerPhone) return
+
+    const result = await sendOrderAlertWhatsApp(
+      order.customerPhone,
+      order.orderNumber,
+      'print ho gaya ✓',
+      `${order.shop.name} se apna print le aaye. Naam: ${order.customerName || '—'}. Dhanyavaad!`,
+    )
+    await audit({
+      shopId: order.shopId,
+      actorType: 'SYSTEM',
+      action: 'WHATSAPP_ORDER_ALERT',
+      entity: 'Order',
+      entityId: orderId,
+      meta: { status: result.status, detail: result.detail?.slice(0, 120), orderNumber: order.orderNumber },
+    })
+  } catch (err) {
+    // Never let a WhatsApp problem break the device event pipeline.
+    console.error('[whatsapp] order alert failed:', err instanceof Error ? err.message : err)
+  }
 }
 
 export async function ensureSubscriptionUsable(shopId: string, subscription: { status: string; expiresAt: Date | null } | null) {
