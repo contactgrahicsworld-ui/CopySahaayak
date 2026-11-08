@@ -85,3 +85,4 @@ connector/**/bin/
 connector/**/obj/
 connector/publish/
 download/connector/
+prisma/*.pg-backup

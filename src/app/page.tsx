@@ -11,7 +11,6 @@ import {
   BellRing,
   Download,
   Store,
-  MonitorDown,
   CheckCircle2,
   TriangleAlert,
   BookOpen,
@@ -113,10 +112,10 @@ export default async function Home() {
           </nav>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
-              <Link href="/login">Sign in</Link>
+              <Link href="/login">Shop Owner</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/register">Start free</Link>
+              <Link href="/super/login">Super Admin</Link>
             </Button>
           </div>
         </div>
@@ -137,16 +136,18 @@ export default async function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button asChild size="lg" className="w-full sm:w-auto">
-              <Link href="/register">Start free — register your shop</Link>
+              <Link href="/login">
+                <Store className="h-4 w-4 mr-2" aria-hidden /> Shop Owner — 7-day free trial
+              </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
-              <Link href="#download">
-                <MonitorDown className="h-4 w-4 mr-2" aria-hidden /> Desktop app
+              <Link href="/super/login">
+                <ShieldCheck className="h-4 w-4 mr-2" aria-hidden /> Super Admin
               </Link>
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-5">
-            Customers never need an account — they just scan your shop QR.
+            Dukaan owner? “Shop Owner” par click karein — naya account banayein ya sign in karein. Platform owner? “Super Admin”. Customers never need an account — they just scan your shop QR.
           </p>
         </div>
       </section>
@@ -245,11 +246,13 @@ export default async function Home() {
             Register your shop, print your QR, install Desktop Sahaayak and tag your printers. That’s the whole setup.
           </p>
           <Button asChild size="lg">
-            <Link href="/register">Start free — register your shop</Link>
+            <Link href="/login">
+              <Store className="h-4 w-4 mr-2" aria-hidden /> Shop Owner — start your 7-day free trial
+            </Link>
           </Button>
           <p className="mt-4 text-xs text-muted-foreground flex items-center justify-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
-            Free plan available · No card needed
+            7-day free trial · No card needed · After trial, pay by UPI for the plan you pick
           </p>
         </div>
       </section>
@@ -265,7 +268,7 @@ export default async function Home() {
               </a>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/super">
+              <Link href="/super/login">
                 <ShieldCheck className="h-4 w-4 mr-1.5" aria-hidden /> Super Admin
               </Link>
             </Button>

@@ -3,8 +3,9 @@
 // First-run platform setup: the FIRST Super Admin creates their own account here.
 // No credentials ship with the app — this page is only reachable while no active
 // SUPER_ADMIN exists (GET /api/setup → setupDone:false), and locks forever after.
+// This page is for the PLATFORM OWNER ONLY — shop owners register via the
+// "Shop Owner" entry on the home page (/register), never here.
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,7 +15,6 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 
 export default function SetupPage() {
-  const router = useRouter()
   const [checking, setChecking] = useState(true)
   const [locked, setLocked] = useState(false)
   const [name, setName] = useState('')
@@ -59,8 +59,10 @@ export default function SetupPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Setup failed')
-      toast.success('Platform setup complete. Please sign in.')
-      router.push('/login')
+      toast.success('Platform owner account created! Now sign in.')
+      // Hard navigation to the SUPER-ONLY login — the created account can only
+      // sign in through the Super Admin portal.
+      window.location.assign('/super/login?created=1')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Setup failed')
       setLoading(false)
@@ -88,7 +90,7 @@ export default function SetupPage() {
           </CardHeader>
           <CardContent className="text-center">
             <Button asChild className="w-full">
-              <Link href="/login">Go to sign in</Link>
+              <Link href="/super/login">Go to Super Admin sign in</Link>
             </Button>
           </CardContent>
         </Card>
@@ -101,12 +103,16 @@ export default function SetupPage() {
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <ShieldCheck className="h-8 w-8 mx-auto mb-2" aria-hidden />
-          <CardTitle className="text-xl">First-time platform setup</CardTitle>
+          <CardTitle className="text-xl">Super Admin account creation</CardTitle>
           <CardDescription>
             Create the one platform-owner account. This page works only once — after this it locks permanently.
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <p className="mb-3 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            Ye page <b>sirf platform owner (Super Admin)</b> ke liye hai — yahan dukaan owner account nahi banta.
+            Dukaan register karne ke liye home page par <b>“Shop Owner”</b> button use karein.
+          </p>
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="name">Your name</Label>
@@ -151,7 +157,8 @@ export default function SetupPage() {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground mt-4 text-center">
-            Already set up? <Link href="/login" className="underline">Sign in</Link>
+            Dukaan owner? Home page par <b>“Shop Owner”</b> button use karein ·
+            <Link href="/" className="underline"> Back to home</Link>
           </p>
         </CardContent>
       </Card>

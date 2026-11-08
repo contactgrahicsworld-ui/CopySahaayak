@@ -1,6 +1,8 @@
-// Shop self-registration: creates the shop (ACTIVE, Free plan) + its owner
+// Shop self-registration: creates the shop (ACTIVE, 7-day TRIAL) + its owner
 // account. No super-admin approval needed to start; the super admin can
 // suspend shops from the platform dashboard. Credentials are never predefined.
+// Trial model: after 7 days the subscription expires and the owner picks a paid
+// plan (UPI → platform admin, verified by UTR) to keep receiving orders.
 import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { registerSchema } from '@/lib/validation'
@@ -32,8 +34,8 @@ export async function POST(req: Request) {
       if (emailTaken) return jsonError(409, 'This email is already registered. Please sign in.')
 
       await ensurePlatformBootstrap()
-      const freePlan = await db.plan.findUnique({ where: { code: 'FREE' } })
-      if (!freePlan) return jsonError(500, 'Plans are not provisioned yet')
+      const trialPlan = await db.plan.findUnique({ where: { code: 'TRIAL' } })
+      if (!trialPlan) return jsonError(500, 'Plans are not provisioned yet')
 
       const now = new Date()
       // Hash BEFORE opening the transaction — bcrypt must not hold the DB connection.
@@ -51,7 +53,7 @@ export async function POST(req: Request) {
             isActive: true,
             pricingRules: { create: defaultPricingRules() },
             subscription: {
-              create: { planId: freePlan.id, status: 'ACTIVE', startsAt: now, expiresAt: new Date(now.getTime() + freePlan.durationDays * 86400_000) },
+              create: { planId: trialPlan.id, status: 'ACTIVE', startsAt: now, expiresAt: new Date(now.getTime() + trialPlan.durationDays * 86400_000) },
             },
           },
         })

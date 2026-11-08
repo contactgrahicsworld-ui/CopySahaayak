@@ -36,7 +36,9 @@ export async function GET(req: Request) {
 }
 
 const paySchema = z.object({
-  planCode: z.enum(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
+  // Not a hardcoded enum: the super admin controls which plans exist/are active,
+  // so the code is validated against the DB right below.
+  planCode: z.string().trim().regex(/^[A-Z]{2,20}$/),
   utr: z.string().trim().regex(/^[a-zA-Z0-9]{8,22}$/),
   payerName: z.string().trim().max(60).optional(),
 })

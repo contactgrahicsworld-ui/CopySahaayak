@@ -28,7 +28,7 @@ export type PrintJobStatus = (typeof PRINT_JOB_STATUSES)[number]
 export const USER_ROLES = ['SUPER_ADMIN', 'SHOP_ADMIN', 'SHOP_STAFF'] as const
 export type UserRole = (typeof USER_ROLES)[number]
 
-export const PLAN_CODES = ['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'] as const
+export const PLAN_CODES = ['TRIAL', 'FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'] as const
 
 // Business limits (server-enforced)
 export const LIMITS = {

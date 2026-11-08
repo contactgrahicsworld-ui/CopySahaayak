@@ -110,7 +110,7 @@ export const createShopSchema = z.object({
   phone: z.string().trim().max(20).optional(),
   adminEmail: z.string().trim().email(),
   adminPassword: z.string().min(8).max(100),
-  planCode: z.enum(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']).default('FREE'),
+  planCode: z.enum(['TRIAL', 'FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']).default('TRIAL'),
 })
 
 export const planSchema = z.object({

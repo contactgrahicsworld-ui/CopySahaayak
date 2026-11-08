@@ -191,7 +191,7 @@ function ShopsTab() {
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', ownerName: '', phone: '', adminEmail: '', adminPassword: '', planCode: 'FREE' })
+  const [form, setForm] = useState({ name: '', ownerName: '', phone: '', adminEmail: '', adminPassword: '', planCode: 'TRIAL' })
   const [saving, setSaving] = useState(false)
   const [newCreds, setNewCreds] = useState<{ email: string; password?: string } | null>(null)
   const [del, setDel] = useState<ShopRow | null>(null)
@@ -225,7 +225,7 @@ function ShopsTab() {
       toast({ title: 'Shop created' })
       setNewCreds({ email: form.adminEmail, password: form.adminPassword })
       setCreateOpen(false)
-      setForm({ name: '', ownerName: '', phone: '', adminEmail: '', adminPassword: '', planCode: 'FREE' })
+      setForm({ name: '', ownerName: '', phone: '', adminEmail: '', adminPassword: '', planCode: 'TRIAL' })
       load()
     } catch (err) {
       toast({ title: 'Create failed', description: err instanceof Error ? err.message : '', variant: 'destructive' })
@@ -256,11 +256,11 @@ function ShopsTab() {
       const res = await fetch(`/api/super/shops/${planFree.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'RESET_PLAN_FREE' }),
+        body: JSON.stringify({ action: 'RESET_PLAN_TRIAL' }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      toast({ title: `${planFree.slug} moved to the Free plan` })
+      toast({ title: `${planFree.slug} moved to the Trial (7 din) plan` })
       setPlanFree(null)
       load()
     } catch (err) {
@@ -343,8 +343,8 @@ function ShopsTab() {
                   <Button size="sm" variant="outline" asChild aria-label={`${s.name} का backup डाउनलोड करें`}>
                     <a href={`/api/admin/backup?range=${backupRange}&shopId=${s.id}`} download><Download className="h-3.5 w-3.5 mr-1" aria-hidden />Backup</a>
                   </Button>
-                  {s.subscription?.plan?.code && s.subscription.plan.code !== 'FREE' && (
-                    <Button size="sm" variant="outline" aria-label={`Move ${s.slug} to the Free plan`} onClick={() => setPlanFree(s)}><Undo2 className="h-3.5 w-3.5 mr-1" aria-hidden />Plan → Free</Button>
+                  {s.subscription?.plan?.code && !['FREE', 'TRIAL'].includes(s.subscription.plan.code) && (
+                    <Button size="sm" variant="outline" aria-label={`Move ${s.slug} to the Trial plan`} onClick={() => setPlanFree(s)}><Undo2 className="h-3.5 w-3.5 mr-1" aria-hidden />Plan → Trial</Button>
                   )}
                   <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" aria-label={`Delete ${s.slug}`} onClick={() => { setDel(s); setDelConfirm('') }}><Trash2 className="h-3.5 w-3.5" aria-hidden /></Button>
                 </div>
@@ -370,7 +370,7 @@ function ShopsTab() {
               <Select value={form.planCode} onValueChange={(v) => setForm({ ...form, planCode: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  {['TRIAL', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -414,9 +414,9 @@ function ShopsTab() {
       <Dialog open={!!planFree} onOpenChange={(v) => !v && setPlanFree(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Move {planFree?.name} to the Free plan?</DialogTitle>
+            <DialogTitle>Move {planFree?.name} to the Trial (7 din) plan?</DialogTitle>
             <DialogDescription>
-              The paid plan ({planFree?.subscription?.plan?.name}) ends immediately and Free plan limits apply. Pending payments stay in the verification queue and the shop owner is notified.
+              The paid plan ({planFree?.subscription?.plan?.name}) ends immediately and 7-day Trial limits apply. Pending payments stay in the verification queue and the shop owner is notified.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

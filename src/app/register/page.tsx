@@ -1,12 +1,15 @@
 'use client'
 
-// Shop self-registration: creates the shop + owner account and signs in.
+// Shop owner creation page — deliberately styled like the Super Admin creation
+// page (/setup) so the two portals look like siblings of one product. Every new
+// shop starts on a 7-day FREE TRIAL; after it ends the owner picks a paid plan
+// and pays by UPI straight to the platform (super admin) UPI.
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Store, Loader2 } from 'lucide-react'
+import { Store, Loader2, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -48,7 +51,7 @@ export default function RegisterPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
-      toast.success(`Welcome! Your shop page: /s/${data.shopSlug}`)
+      toast.success(`Welcome! Your 7-day free trial has started. Your shop page: /s/${data.shopSlug}`)
       // Hard navigation: the just-created session cookie must be picked up by
       // the dashboard server component — client-router push can silently race.
       window.location.assign('/admin')
@@ -63,10 +66,17 @@ export default function RegisterPage() {
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <Store className="h-8 w-8 mx-auto mb-2" aria-hidden />
-          <CardTitle className="text-xl">Register your photocopy shop</CardTitle>
-          <CardDescription>Free plan, no card needed. You can change everything later.</CardDescription>
+          <CardTitle className="text-xl">Shop Owner account creation</CardTitle>
+          <CardDescription>Apni dukaan register karein — turant 7 din ka free trial shuru</CardDescription>
         </CardHeader>
         <CardContent>
+          <p className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            <Clock className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+            <span>
+              <b>7 din ka FREE trial</b> — no card needed, sab functions milte hain. Trial khatam hone par apna plan
+              chun kar UPI se platform admin ke UPI par pay karein (UTR verify hone par plan activate).
+            </span>
+          </p>
           <form onSubmit={submit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -110,11 +120,15 @@ export default function RegisterPage() {
               <Input id="shopAddress" value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} placeholder="Shop 12, MG Road, Pune" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Create my shop
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Create my shop — start 7-day free trial
             </Button>
           </form>
           <p className="text-xs text-muted-foreground mt-4 text-center">
-            Already registered? <Link href="/login" className="underline">Sign in</Link> · Forgot password? <Link href="/forgot-password" className="underline">Reset it</Link>
+            Pehle se account hai? <Link href="/login" className="underline">Shop Owner sign in</Link> · Forgot password? <Link href="/forgot-password" className="underline">Reset it</Link>
+          </p>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Platform owner (Super Admin)? Home page par <b>“Super Admin”</b> button use karein — dukaan account alag hai ·
+            <Link href="/" className="underline"> Back to home</Link>
           </p>
         </CardContent>
       </Card>

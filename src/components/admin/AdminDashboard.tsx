@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
+import { PlanClock } from '@/components/admin/PlanClock'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
@@ -55,6 +56,8 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
   const [emailOpen, setEmailOpen] = useState(false)
   const [selfEmail, setSelfEmail] = useState(user.email)
   const [superNoticeOpen, setSuperNoticeOpen] = useState(notice === 'super-only')
+  // Live plan clock: plan name + expiry fed by the subscription API.
+  const [planInfo, setPlanInfo] = useState<{ planName: string; status: string; expiresAt: string | null } | null>(null)
   // White-label: the shop's own name is the app name everywhere (tab title too).
   useEffect(() => { document.title = `${shop.name} — Dashboard` }, [shop.name])
   // Plan expiry watch: warn from 7 days before the subscription ends.
@@ -62,11 +65,22 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
   useEffect(() => {
     fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
       const sub = d?.subscription
+      if (!sub) return
+      setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null })
       if (!sub?.expiresAt || !['ACTIVE', 'PENDING_VERIFICATION'].includes(sub.status)) return
       const ms = new Date(sub.expiresAt).getTime() - Date.now()
       const daysLeft = Math.ceil(ms / 86400000)
       if (daysLeft <= 7) setExpiry({ planName: sub.plan?.name || 'Current plan', expiresAt: sub.expiresAt, daysLeft })
     }).catch(() => {})
+    // Refresh the clock data every minute so renewals reflect without a reload.
+    const t = setInterval(() => {
+      fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+        const sub = d?.subscription
+        if (!sub) return
+        setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null })
+      }).catch(() => {})
+    }, 60000)
+    return () => clearInterval(t)
   }, [])
 
   async function logout() {
@@ -104,6 +118,7 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
       </header>
 
       <div className="container mx-auto px-3 sm:px-4 py-4">
+        {planInfo && <PlanClock planName={planInfo.planName} status={planInfo.status} expiresAt={planInfo.expiresAt} />}
         {superNoticeOpen && (
           <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <div className="flex items-start gap-2">
@@ -117,9 +132,9 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
                   orders/customers data nahi dekh sakta, isliye dono accounts alag hain.
                 </p>
                 <p className="text-xs">
-                  Super Admin panel kholne ke liye: pehle <b>Sign out</b> karein → home page par neeche footer me
-                  <b> “Super Admin”</b> link par click karein (ya seedha <b>/super</b> URL kholein) → apne Super Admin
-                  account se sign in karein. Agar Super Admin account ka password yaad nahi, to login page par
+                  Super Admin panel kholne ke liye: pehle <b>Sign out</b> karein → home page par <b>“Super Admin”</b> button
+                  par click karein (ya seedha <b>/super/login</b> kholein) → apne Super Admin account se sign in karein.
+                  Agar Super Admin account ka password yaad nahi, to us login page par
                   <b> “Forgot password?”</b> se OTP apne us email par mangwa lein.
                 </p>
               </div>
@@ -1199,7 +1214,7 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
       const res = await fetch('/api/admin/subscription/downgrade', { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Downgrade failed')
-      toast({ title: 'Moved to the Free plan', description: 'Free plan limits now apply. You can upgrade again anytime.' })
+      toast({ title: 'Moved to the Trial plan', description: '7-day Trial limits now apply. You can upgrade again anytime.' })
       setDowngradeOpen(false)
       fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then(setSub)
     } catch (err) {
@@ -1311,9 +1326,9 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
           {sub?.subscription?.plan && sub.subscription.plan.pricePaise > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-md border px-3 py-2">
               <p className="text-sm text-muted-foreground flex-1">
-                Don&apos;t need paid features right now? Move this shop back to the <strong className="text-foreground">Free plan</strong> — Free limits apply immediately, payment history is kept and you can upgrade again anytime.
+                Paid plan abhi nahi chahiye? Move this shop back to the <strong className="text-foreground">7-day Trial plan</strong> — Trial limits apply immediately, payment history is kept and you can upgrade again anytime. (Trial ke baad plan lena zaroori hai.)
               </p>
-              <Button size="sm" variant="outline" className="shrink-0" onClick={() => setDowngradeOpen(true)}>Downgrade to Free</Button>
+              <Button size="sm" variant="outline" className="shrink-0" onClick={() => setDowngradeOpen(true)}>Downgrade to Trial</Button>
             </div>
           )}
         </CardContent>
@@ -1367,15 +1382,15 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
       <Dialog open={downgradeOpen} onOpenChange={setDowngradeOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Move to the Free plan?</DialogTitle>
+            <DialogTitle>Move to the 7-day Trial plan?</DialogTitle>
             <DialogDescription>
-              Your {sub?.subscription?.plan?.name} plan ends immediately and Free plan limits apply (orders per month, devices). Your payment history is kept and you can upgrade again anytime.
+              Your {sub?.subscription?.plan?.name} plan ends immediately and 7-day Trial limits apply (orders per month, devices). Your payment history is kept and you can upgrade again anytime. Trial khatam hone par paid plan lena hoga.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDowngradeOpen(false)}>Cancel</Button>
             <Button variant="destructive" disabled={downgrading} onClick={downgradeToFree}>
-              {downgrading && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Move to Free plan
+              {downgrading && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Move to Trial plan
             </Button>
           </DialogFooter>
         </DialogContent>

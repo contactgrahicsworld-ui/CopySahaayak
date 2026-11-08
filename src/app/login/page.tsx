@@ -1,12 +1,14 @@
 'use client'
 
+// Shop Owner ONLY login. The Super Admin has a separate portal (/super/login)
+// so the two account types can never be confused — a super signing in here is
+// rejected and their accidental session destroyed, never silently routed.
 import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Printer, Loader2 } from 'lucide-react'
+import { Store, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -19,9 +21,6 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const params = useSearchParams()
-  const nextParam = params.get('next')
-  const isSuperAttempt = nextParam === '/super'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,6 +32,14 @@ function LoginForm() {
     fetch('/api/setup')
       .then((r) => r.json())
       .then((d) => setSetupPending(d?.setupDone === false))
+      .catch(() => {})
+    // Already signed in? Go straight to the right portal.
+    fetch('/api/auth/me', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.user?.role === 'SHOP_ADMIN') window.location.assign('/admin')
+        else if (d?.user?.role === 'SUPER_ADMIN') window.location.assign('/super')
+      })
       .catch(() => {})
   }, [])
 
@@ -47,24 +54,21 @@ function LoginForm() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Login failed')
-      // Opening /super with a shop-owner account is the #1 login confusion: the
-      // guard would silently bounce them to their shop dashboard. Say it plainly,
-      // give the page a moment to show this toast, and the dashboard banner takes
-      // over after the redirect.
-      if (isSuperAttempt && data.user?.role !== 'SUPER_ADMIN') {
-        toast.warning(
-          'Aapka account Dukaan Owner hai, Super Admin nahi — dukaan ka dashboard khul raha hai. Super Admin panel ke liye alag platform super account se sign in karein.',
-          { duration: 3500 },
+      if (data.user?.role === 'SUPER_ADMIN') {
+        // Shop-owner portal: a super signing in here gets bounced out immediately
+        // (session destroyed) — the Super Admin portal is a separate button.
+        await fetch('/api/auth/logout', { method: 'POST' })
+        toast.error(
+          'Ye login sirf Shop Owner ke liye hai. Aapka account Super Admin hai — home page par "Super Admin" button use karein.',
+          { duration: 5000 },
         )
-        await new Promise((r) => setTimeout(r, 1500))
-        window.location.assign('/admin?notice=super-only')
+        setLoading(false)
         return
       }
-      const next = params.get('next')
       // Hard navigation instead of router.push: guarantees the fresh session
       // cookie is used by server components on every browser, and can never
       // silently race (a stuck disabled button with no navigation).
-      window.location.assign(next && next.startsWith('/') ? next : data.user.role === 'SUPER_ADMIN' ? '/super' : '/admin')
+      window.location.assign('/admin')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Login failed')
       setLoading(false)
@@ -75,17 +79,11 @@ function LoginForm() {
     <main className="min-h-screen flex items-center justify-center px-4 bg-muted/30">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Printer className="h-8 w-8 mx-auto mb-2" aria-hidden />
-          <CardTitle className="text-xl">CopySahaayak</CardTitle>
-          <CardDescription>Shop owner or platform admin sign in</CardDescription>
+          <Store className="h-8 w-8 mx-auto mb-2" aria-hidden />
+          <CardTitle className="text-xl">Shop Owner sign in</CardTitle>
+          <CardDescription>Apni dukaan ka dashboard — sirf dukaan owner account ke liye</CardDescription>
         </CardHeader>
         <CardContent>
-          {isSuperAttempt && (
-            <div role="note" className="mb-4 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2.5 text-xs text-sky-900">
-              <b>Super Admin panel</b> — platform ka super account use karein (jo aapne sabse pehle setup ke waqt banaya tha;
-              email/password dukaan owner account se alag hai). Shop owner account se sign in karne par dukaan ka dashboard khulega.
-            </div>
-          )}
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
@@ -111,10 +109,11 @@ function LoginForm() {
             )}
             <Link href="/forgot-password" className="underline">Forgot password?</Link>
             {' · '}
-            <Link href="/register" className="underline">New shop? Create account</Link>
+            <Link href="/register" className="underline">New shop? 7-day free trial</Link>
           </p>
           <p className="text-xs text-center mt-2">
-            <Link href="/" className="underline">Back to home</Link>
+            Platform owner? Home page par <b>“Super Admin”</b> button use karein ·
+            <Link href="/" className="underline"> Back to home</Link>
           </p>
         </CardContent>
       </Card>

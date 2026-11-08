@@ -1,7 +1,9 @@
-// Owner self-service downgrade: move this shop back to the Free plan immediately.
-// Payment history is preserved; a pending UTR payment blocks the downgrade so the
-// platform admin's verification flow stays unambiguous. Downgrading only tightens
-// limits going forward — it never touches existing orders, devices or printers.
+// Owner self-service downgrade: move this shop back to the 7-day TRIAL plan
+// immediately. Payment history is preserved; a pending UTR payment blocks the
+// downgrade so the platform admin's verification flow stays unambiguous.
+// Downgrading only tightens limits going forward — it never touches existing
+// orders, devices or printers. (Trial model: no permanent free tier — after the
+// 7 trial days the shop must pick a paid plan to keep receiving orders.)
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireAnyShopAdmin } from '@/lib/auth'
@@ -19,8 +21,8 @@ export async function POST(req: Request) {
     })
     if (!sub) return jsonError(404, 'No subscription found')
 
-    // Pending-payment check FIRST: a shop still on the FREE plan that has just
-    // submitted its first UTR must be told to wait (409), not "already on Free".
+    // Pending-payment check FIRST: a shop still on the TRIAL plan that has just
+    // submitted its first UTR must be told to wait (409), not "already on Trial".
     const pending = await db.subscriptionPayment.findFirst({
       where: { shopId: ctx.user.shopId, status: 'PENDING' },
     })
@@ -31,19 +33,19 @@ export async function POST(req: Request) {
       )
     }
 
-    if (sub.plan.code === 'FREE') return jsonError(400, 'You are already on the Free plan')
+    if (sub.plan.code === 'TRIAL') return jsonError(400, 'You are already on the Trial plan')
 
-    const freePlan = await db.plan.findUnique({ where: { code: 'FREE' } })
-    if (!freePlan) return jsonError(500, 'Free plan is not configured')
+    const trialPlan = await db.plan.findUnique({ where: { code: 'TRIAL' } })
+    if (!trialPlan) return jsonError(500, 'Trial plan is not configured')
 
     const now = new Date()
     await db.subscription.update({
       where: { shopId: ctx.user.shopId },
       data: {
-        planId: freePlan.id,
+        planId: trialPlan.id,
         status: 'ACTIVE',
         startsAt: sub.startsAt ?? now,
-        expiresAt: new Date(now.getTime() + freePlan.durationDays * 86400_000),
+        expiresAt: new Date(now.getTime() + trialPlan.durationDays * 86400_000),
       },
     })
 
@@ -51,8 +53,8 @@ export async function POST(req: Request) {
       data: {
         audience: 'SUPER',
         shopId: ctx.user.shopId,
-        title: 'Shop moved to the Free plan',
-        body: `${sub.plan.name} → Free (self-service downgrade)`,
+        title: 'Shop moved to the Trial plan',
+        body: `${sub.plan.name} → Trial 7-day (self-service downgrade)`,
       },
     })
 
@@ -63,9 +65,9 @@ export async function POST(req: Request) {
       action: 'SUBSCRIPTION_DOWNGRADED',
       entity: 'Subscription',
       entityId: sub.id,
-      meta: { fromPlanCode: sub.plan.code, toPlanCode: 'FREE' },
+      meta: { fromPlanCode: sub.plan.code, toPlanCode: 'TRIAL' },
       ip: getClientIp(req),
     })
-    return jsonOk({ ok: true, planCode: 'FREE' })
+    return jsonOk({ ok: true, planCode: 'TRIAL' })
   })
 }
