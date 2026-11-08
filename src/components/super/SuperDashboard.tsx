@@ -38,8 +38,11 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
       <header className="border-b bg-background">
         <div className="container mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-semibold text-sm truncate">CopySahaayak Platform</p>
-            <p className="text-[11px] text-muted-foreground truncate">{selfEmail} · Super Admin</p>
+            <p className="font-semibold text-sm truncate">
+              CopySahaayak Platform
+              <Badge className="ml-2 align-middle text-[10px] font-medium"><ShieldCheck className="h-3 w-3 mr-1" aria-hidden />Super Admin</Badge>
+            </p>
+            <p className="text-[11px] text-muted-foreground truncate">{selfEmail}</p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <Button variant="ghost" size="sm" onClick={() => setEmailOpen(true)} aria-label="Change login email">

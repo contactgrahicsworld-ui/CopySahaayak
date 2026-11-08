@@ -5,7 +5,12 @@ import { AdminDashboard } from '@/components/admin/AdminDashboard'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ notice?: string }>
+}) {
+  const { notice } = await searchParams
   const ctx = await getAuthedUser()
   if (!ctx) redirect('/login?next=/admin')
   if (ctx.user.role === 'SUPER_ADMIN') redirect('/super')
@@ -14,5 +19,11 @@ export default async function AdminPage() {
   const shop = await db.shop.findUnique({ where: { id: ctx.user.shopId } })
   if (!shop) redirect('/login?error=no-shop')
 
-  return <AdminDashboard user={{ name: ctx.user.name, email: ctx.user.email }} shop={{ id: shop.id, name: shop.name, slug: shop.slug }} />
+  return (
+    <AdminDashboard
+      user={{ name: ctx.user.name, email: ctx.user.email }}
+      shop={{ id: shop.id, name: shop.name, slug: shop.slug }}
+      notice={notice === 'super-only' ? 'super-only' : undefined}
+    />
+  )
 }

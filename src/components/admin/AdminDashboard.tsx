@@ -20,7 +20,7 @@ import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, ClipboardList, BadgeCheck, Printer, IndianRupee, BarChart3, Settings, LogOut,
   RefreshCw, FileText, Plus, QrCode, Loader2, Check, X, Store, KeyRound, MessageCircle, Download,
-  TriangleAlert, AtSign,
+  TriangleAlert, AtSign, ShieldCheck,
 } from 'lucide-react'
 
 // wa.me deep link: works on every phone/WhatsApp Web with no API approval needed.
@@ -47,13 +47,14 @@ function orderWhatsappText(o: { orderNumber: string; status: string; totalPaise:
 interface UserProp { name: string; email: string }
 interface ShopProp { id: string; name: string; slug: string }
 
-export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp }) {
+export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: ShopProp; notice?: 'super-only' }) {
   const { toast } = useToast()
   const router = useRouter()
   const [tab, setTab] = useState('overview')
   const [pwOpen, setPwOpen] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
   const [selfEmail, setSelfEmail] = useState(user.email)
+  const [superNoticeOpen, setSuperNoticeOpen] = useState(notice === 'super-only')
   // White-label: the shop's own name is the app name everywhere (tab title too).
   useEffect(() => { document.title = `${shop.name} — Dashboard` }, [shop.name])
   // Plan expiry watch: warn from 7 days before the subscription ends.
@@ -81,7 +82,10 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
           <div className="flex items-center gap-2 min-w-0">
             <Store className="h-5 w-5 shrink-0" aria-hidden />
             <div className="min-w-0">
-              <p className="font-semibold text-sm truncate">{shop.name}</p>
+              <p className="font-semibold text-sm truncate">
+                {shop.name}
+                <Badge variant="secondary" className="ml-2 align-middle text-[10px] font-medium">Dukaan Owner</Badge>
+              </p>
               <p className="text-[11px] text-muted-foreground truncate">{selfEmail} · /s/{shop.slug}</p>
             </div>
           </div>
@@ -100,6 +104,31 @@ export function AdminDashboard({ user, shop }: { user: UserProp; shop: ShopProp 
       </header>
 
       <div className="container mx-auto px-3 sm:px-4 py-4">
+        {superNoticeOpen && (
+          <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="flex items-start gap-2">
+              <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+              <div className="flex-1 space-y-1">
+                <p className="font-semibold">Ye aapka <span className="underline">dukaan ka dashboard</span> hai ({shop.name}) — Super Admin dashboard nahi.</p>
+                <p>
+                  Aap <b>{selfEmail}</b> (Dukaan Owner) se signed in hain. Platform ka <b>Super Admin panel</b> ek
+                  alag account se khulta hai — wahi jo aapne sabse pehle platform setup ke waqt banaya tha
+                  (uska email/password is dukaan account se different hai). Security ke liye Super Admin dukaan ka
+                  orders/customers data nahi dekh sakta, isliye dono accounts alag hain.
+                </p>
+                <p className="text-xs">
+                  Super Admin panel kholne ke liye: pehle <b>Sign out</b> karein → home page par neeche footer me
+                  <b> “Super Admin”</b> link par click karein (ya seedha <b>/super</b> URL kholein) → apne Super Admin
+                  account se sign in karein. Agar Super Admin account ka password yaad nahi, to login page par
+                  <b> “Forgot password?”</b> se OTP apne us email par mangwa lein.
+                </p>
+              </div>
+              <button type="button" onClick={() => setSuperNoticeOpen(false)} aria-label="Close notice" className="shrink-0 rounded p-1 hover:bg-amber-100">
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          </div>
+        )}
         {expiry && (
           <div role="alert" className={`mb-4 flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border px-4 py-3 text-sm ${expiry.daysLeft < 0 ? 'border-red-300 bg-red-50 text-red-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
             <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />
