@@ -620,6 +620,182 @@ async function main() {
     }
   }
 
+  // ---------- 12A. Daily session expiry policy ----------
+  console.log('[12A] Daily (roz) session expiry')
+  {
+    // The login response must set a 1-day (86400s) cookie lifetime.
+    const raw = await fetch(`${BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: BASE },
+      body: JSON.stringify({ email: SHOP_B.email, password: SHOP_B.password }),
+    })
+    const setCookies = raw.headers.getSetCookie?.() || []
+    const pcs = setCookies.find((c) => c.startsWith('pcs_session='))
+    const maxAge = pcs ? (pcs.match(/Max-Age=(\d+)/i) || [])[1] : null
+    check('login cookie Max-Age = 86400 (session dies daily)', maxAge === '86400', `got ${maxAge}`)
+    check('login cookie HttpOnly', !!pcs && /httponly/i.test(pcs))
+    check('login cookie SameSite=Lax', !!pcs && /samesite=lax/i.test(pcs))
+  }
+
+  // ---------- 12B. Authority transfer — SHOP scope (Power of Attorney) ----------
+  console.log('[12B] Authority transfer (shop owner → new owner, email link)')
+  const NEW_OWNER = { email: `newowner.b.${RUN}@testshop-test.in`, password: `NewOwnr#${RUN}4B`, name: `Naya Malik ${RUN}` }
+  const jarNewOwner = new Jar()
+  {
+    // RBAC guards first
+    const noAuth = await req('/api/admin/transfer', { method: 'POST', body: { toName: 'x x', toEmail: `x.${RUN}@x.in`, currentPassword: 'irrelevant' } })
+    check('transfer initiate without session → 401', noAuth.res.status === 401)
+    const wrongPortal = await req('/api/super/transfer', { method: 'POST', body: { toName: 'x x', toEmail: `x.${RUN}@x.in`, currentPassword: 'irrelevant' }, jar: jarB })
+    check('shop owner blocked from PLATFORM transfer (403)', wrongPortal.res.status === 403)
+
+    // bad password refused
+    const badPw = await req('/api/admin/transfer', {
+      method: 'POST', jar: jarB,
+      body: { toName: NEW_OWNER.name, toEmail: NEW_OWNER.email, currentPassword: 'wrong-password' },
+    })
+    check('transfer with wrong current password → 401', badPw.res.status === 401, `got ${badPw.res.status}`)
+
+    // self-transfer refused
+    const selfT = await req('/api/admin/transfer', {
+      method: 'POST', jar: jarB,
+      body: { toName: 'Self Self', toEmail: SHOP_B.email, currentPassword: SHOP_B.password },
+    })
+    check('transfer to own email rejected 400', selfT.res.status === 400, `got ${selfT.res.status}`)
+
+    // transfer to an ACTIVE account refused
+    const activeT = await req('/api/admin/transfer', {
+      method: 'POST', jar: jarB,
+      body: { toName: 'Owner A', toEmail: SHOP_A.email, currentPassword: SHOP_B.password },
+    })
+    check('transfer to an active account email → 409', activeT.res.status === 409, `got ${activeT.res.status}`)
+
+    // successful initiation → email with one-time link
+    const init = await req('/api/admin/transfer', {
+      method: 'POST', jar: jarB,
+      body: { toName: NEW_OWNER.name, toEmail: NEW_OWNER.email, currentPassword: SHOP_B.password },
+    })
+    check('shop transfer initiated, email sent', init.res.status === 200 && init.data?.sent === true, JSON.stringify(init.data))
+    const pendingList = await req('/api/admin/transfer', { jar: jarB })
+    check('pending transfer visible to owner', pendingList.data?.pending?.toEmail === NEW_OWNER.email, JSON.stringify(pendingList.data))
+
+    const box2 = await req('/api/test/outbox', { headers: INTERNAL })
+    const mail2 = (box2.data?.mail || []).filter((m) => m.to === NEW_OWNER.email).pop()
+    const tokenMatch = mail2 ? mail2.html.match(/\/transfer\/accept\?token=([A-Za-z0-9_-]+)/) : null
+    check('transfer email contains one-time accept link', !!tokenMatch)
+    const token = tokenMatch ? tokenMatch[1] : ''
+
+    if (!token) {
+      check('transfer flow aborted early (no token in email)', false, 'cannot continue SHOP transfer assertions')
+    } else {
+    // anonymous + shop-owner cannot touch PLATFORM token details? (they can view any
+    // token they hold — but the accept POST is what matters; view is public-by-token design)
+    const details = await req(`/api/transfer/${token}`)
+    check('transfer details load (scope SHOP)', details.res.status === 200 && details.data?.transfer?.scope === 'SHOP', JSON.stringify(details.data))
+    check('transfer details never leak the token', !JSON.stringify(details.data || {}).includes(token), 'token echoed back!')
+
+    // weak acceptance password rejected — nothing changes
+    const weak = await req(`/api/transfer/${token}`, { method: 'POST', body: { password: 'short1' } })
+    check('accept with weak password → 400', weak.res.status === 400)
+
+    // correct acceptance — new owner sets own password, auto signed in
+    const accept = await req(`/api/transfer/${token}`, { method: 'POST', body: { password: NEW_OWNER.password }, jar: jarNewOwner })
+    check('transfer accepted, new owner auto signed-in', accept.res.status === 200 && accept.data?.ok === true, JSON.stringify(accept.data))
+    const meNew = await req('/api/auth/me', { jar: jarNewOwner })
+    check('new authority is SHOP_ADMIN of the same shop', meNew.data?.user?.role === 'SHOP_ADMIN' && meNew.data?.user?.email === NEW_OWNER.email, JSON.stringify(meNew.data))
+
+    // new owner can actually run the shop
+    const shopAdmin = await req('/api/admin/shop', { jar: jarNewOwner })
+    check('new owner has full dashboard access (shop settings 200)', shopAdmin.res.status === 200, `got ${shopAdmin.res.status}`)
+
+    // old owner: sessions revoked everywhere, credentials dead
+    const oldMe = await req('/api/auth/me', { jar: jarB })
+    check('previous owner signed out everywhere', oldMe.res.status === 200 && oldMe.data?.user === null, JSON.stringify(oldMe.data))
+    const oldLogin = await req('/api/auth/login', { method: 'POST', body: { email: SHOP_B.email, password: SHOP_B.password } })
+    check('previous owner cannot log in (deactivated) 401', oldLogin.res.status === 401, `got ${oldLogin.res.status}`)
+
+    // token is single-use
+    const reuse2 = await req(`/api/transfer/${token}`, { method: 'POST', body: { password: `Again#${RUN}1A` } })
+    check('transfer token cannot be reused → 410', reuse2.res.status === 410, `got ${reuse2.res.status}`)
+    }
+  }
+
+  // ---------- 12C. Authority transfer — PLATFORM scope + break-glass recovery ----------
+  console.log('[12C] Platform transfer (super → new super) & emergency recovery')
+  const NEW_SUPER = { email: `newsuper.${RUN}@copysahaayak-test.in`, password: `NewSupr#${RUN}6C`, name: `Naya Platform Owner ${RUN}` }
+  const RESET_KEY = process.env.SUPER_SETUP_RESET_KEY || ''
+  {
+    // RBAC: shop owner cannot initiate a PLATFORM transfer
+    const notSuper = await req('/api/super/transfer', { method: 'POST', body: { toName: 'x x', toEmail: `x.${RUN}@x.in`, currentPassword: 'x' }, jar: jarNewOwner })
+    check('shop owner blocked from platform transfer 403', notSuper.res.status === 403, `got ${notSuper.res.status}`)
+
+    // super initiates platform transfer (password-confirmed)
+    const init = await req('/api/super/transfer', {
+      method: 'POST', jar: jarS,
+      body: { toName: NEW_SUPER.name, toEmail: NEW_SUPER.email, currentPassword: SUPER.password },
+    })
+    check('platform transfer initiated', init.res.status === 200 && init.data?.sent === true, JSON.stringify(init.data))
+    const box3 = await req('/api/test/outbox', { headers: INTERNAL })
+    const mail3 = (box3.data?.mail || []).filter((m) => m.to === NEW_SUPER.email).pop()
+    const m3 = mail3 ? mail3.html.match(/\/transfer\/accept\?token=([A-Za-z0-9_-]+)/) : null
+    check('platform transfer email sent with link', !!m3)
+    const ptoken = m3 ? m3[1] : ''
+
+    const jarNS = new Jar()
+    const accept = await req(`/api/transfer/${ptoken}`, { method: 'POST', body: { password: NEW_SUPER.password }, jar: jarNS })
+    check('platform transfer accepted', accept.res.status === 200 && accept.data?.scope === 'PLATFORM', JSON.stringify(accept.data))
+    const meNS = await req('/api/auth/me', { jar: jarNS })
+    check('new platform authority is SUPER_ADMIN', meNS.data?.user?.role === 'SUPER_ADMIN' && meNS.data?.user?.email === NEW_SUPER.email, JSON.stringify(meNS.data))
+    const statsNS = await req('/api/super/stats', { jar: jarNS })
+    check('new super has full platform access', statsNS.res.status === 200)
+
+    const oldSuperMe = await req('/api/auth/me', { jar: jarS })
+    check('old super signed out + deactivated', oldSuperMe.res.status === 200 && oldSuperMe.data?.user === null, JSON.stringify(oldSuperMe.data))
+    const oldSuperLogin = await req('/api/auth/login', { method: 'POST', body: { email: SUPER.email, password: SUPER.password } })
+    check('old super credentials dead 401', oldSuperLogin.res.status === 401)
+    // ---- break-glass recovery (SUPER_SETUP_RESET_KEY) ----
+    if (RESET_KEY) {
+      const setupNow = await req('/api/setup')
+      check('setup reports locked while a super exists', setupNow.data?.setupDone === true)
+
+      const badKey = await req('/api/setup/reset', { method: 'POST', body: { resetKey: 'totally-wrong-recovery-key-123' } })
+      check('recovery with wrong key → 401', badKey.res.status === 401, `got ${badKey.res.status}`)
+
+      const reset1 = await req('/api/setup/reset', { method: 'POST', body: { resetKey: RESET_KEY } })
+      check('recovery key accepted, old super deleted', reset1.res.status === 200 && (reset1.data?.removedSupers || 0) >= 1, JSON.stringify(reset1.data))
+      const claim1 = reset1.data?.claimToken || ''
+
+      const afterReset = await req('/api/setup')
+      check('setup re-locked behind recovery (setupDone=false, recoveryRequired=true)', afterReset.data?.setupDone === false && afterReset.data?.recoveryRequired === true, JSON.stringify(afterReset.data))
+
+      const noClaim = await req('/api/setup', { method: 'POST', body: { name: 'Hacker', email: `hack.${RUN}@x.in`, password: `Haxx#${RUN}9A` } })
+      check('setup WITHOUT claim token → 403 (no public re-open)', noClaim.res.status === 403, `got ${noClaim.res.status}`)
+
+      // Create a temp super with claim1, then reset again to prove single-use tokens
+      const tempSuper = { name: 'Temp Super', email: `temp.${RUN}@copysahaayak-test.in`, password: `Temp#${RUN}8D` }
+      const create1 = await req('/api/setup', { method: 'POST', body: { ...tempSuper, claimToken: claim1 } })
+      check('setup WITH valid claim token → new super created', create1.res.status === 200, JSON.stringify(create1.data))
+      const tmpLogin = await req('/api/auth/login', { method: 'POST', body: { email: tempSuper.email, password: tempSuper.password } })
+      check('temp super can log in', tmpLogin.res.status === 200)
+
+      const reset2 = await req('/api/setup/reset', { method: 'POST', body: { resetKey: RESET_KEY } })
+      check('recovery is repeatable (second reset ok)', reset2.res.status === 200 && (reset2.data?.removedSupers || 0) >= 1, JSON.stringify(reset2.data))
+      const claim2 = reset2.data?.claimToken || ''
+
+      const staleClaim = await req('/api/setup', { method: 'POST', body: { name: 'Stale', email: `stale.${RUN}@x.in`, password: `Stale#${RUN}2E`, claimToken: claim1 } })
+      check('old claim token is single-use → 403', staleClaim.res.status === 403, `got ${staleClaim.res.status}`)
+
+      const finalSuper = { name: `Final Super ${RUN}`, email: `finalsuper.${RUN}@copysahaayak-test.in`, password: `FnlSup#${RUN}5F` }
+      const create2 = await req('/api/setup', { method: 'POST', body: { ...finalSuper, claimToken: claim2 } })
+      check('fresh super created via creation page flow (claim2)', create2.res.status === 200, JSON.stringify(create2.data))
+      const fsLogin = await req('/api/auth/login', { method: 'POST', body: { email: finalSuper.email, password: finalSuper.password } })
+      check('final super logs in through super portal', fsLogin.res.status === 200)
+      const done = await req('/api/setup')
+      check('setup locked again after fresh creation', done.data?.setupDone === true)
+    } else {
+      console.log('  (SUPER_SETUP_RESET_KEY not set — skipping break-glass recovery e2e)')
+    }
+  }
+
   // ---------- 13. Rate limiting (LAST — brute-force attempts pollute the
   // per-IP login bucket for ~15 min, so nothing may follow) ----------
   // Shared Postgres limiter counts per client IP. CI sandboxes may egress from

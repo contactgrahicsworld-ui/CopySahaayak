@@ -28,7 +28,7 @@ async function platformSetting(key: string): Promise<string | null> {
 }
 
 export async function GET(req: Request) {
-  return handleRoute(req, { rateLimit: { ...RATE_LIMITS.readPublic, bucket: 'setup' } }, async () => {
+  return handleRoute(req, { rateLimit: { ...RATE_LIMITS.readPublic, bucket: 'setup-view' } }, async () => {
     const [supers, used] = await Promise.all([
       db.user.count({ where: { role: 'SUPER_ADMIN', isActive: true } }),
       platformSetting(TOMBSTONE),
@@ -42,14 +42,14 @@ export async function POST(req: Request) {
     req,
     { rateLimit: { ...RATE_LIMITS.pairing, bucket: 'setup' } },
     async () => {
-      const body = setupSchema.parse(await req.json())
-      const email = body.email.toLowerCase()
-
       const [activeSupers, used] = await Promise.all([
         db.user.count({ where: { role: 'SUPER_ADMIN', isActive: true } }),
         platformSetting(TOMBSTONE),
       ])
       if (activeSupers > 0) return jsonError(403, 'Setup is already completed. Please sign in instead.')
+
+      const body = setupSchema.parse(await req.json())
+      const email = body.email.toLowerCase()
 
       let claimValid = false
       if (used) {

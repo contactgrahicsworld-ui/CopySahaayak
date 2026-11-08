@@ -16,6 +16,7 @@ export async function GET(req: Request) {
   const box = mockOutbox()
   return NextResponse.json({
     count: box.length,
-    mails: box.map((m) => ({ to: m.to, subject: m.subject, text: m.text, html: m.html })),
+    // Field name `mail` matches the E2E convention (tests/e2e-api.mjs reads .mail).
+    mail: box.map((m) => ({ to: m.to, subject: m.subject, text: m.text, html: m.html })),
   })
 }

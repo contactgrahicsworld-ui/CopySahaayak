@@ -143,3 +143,47 @@ describe('normalizeWaPhone', () => {
     delete process.env.WHATSAPP_PHONE_NUMBER_ID
   })
 })
+
+// ---- Daily session policy + authority transfer schemas ----
+describe('daily session policy (LIMITS)', () => {
+  test('admin sessions expire after exactly 24h (roz expiry)', async () => {
+    const { LIMITS } = await import('@/lib/constants')
+    assert.equal(LIMITS.sessionTtlMs, 24 * 3600 * 1000)
+  })
+  test('authority-transfer links live 24h', async () => {
+    const { LIMITS } = await import('@/lib/constants')
+    assert.equal(LIMITS.transferTtlMs, 24 * 3600 * 1000)
+  })
+})
+
+describe('authority transfer validation', () => {
+  test('transferInitiateSchema accepts a valid handover request', async () => {
+    const { transferInitiateSchema } = await import('@/lib/validation')
+    const v = transferInitiateSchema.parse({ toName: 'Suresh Kumar', toEmail: 'suresh@example.in', currentPassword: 'whatever' })
+    assert.equal(v.toEmail, 'suresh@example.in')
+  })
+  test('transferInitiateSchema rejects bad email / empty name', async () => {
+    const { transferInitiateSchema } = await import('@/lib/validation')
+    assert.throws(() => transferInitiateSchema.parse({ toName: 'x', toEmail: 'not-an-email', currentPassword: 'p' }))
+    assert.throws(() => transferInitiateSchema.parse({ toName: '', toEmail: 'a@b.in', currentPassword: 'p' }))
+  })
+  test('transferAcceptSchema enforces password strength', async () => {
+    const { transferAcceptSchema } = await import('@/lib/validation')
+    assert.throws(() => transferAcceptSchema.parse({ password: 'short1' }))
+    assert.throws(() => transferAcceptSchema.parse({ password: 'longenoughbutnodigits' }))
+    const ok = transferAcceptSchema.parse({ password: 'Strong1Pass' })
+    assert.equal(ok.password, 'Strong1Pass')
+  })
+  test('setupResetSchema requires a long recovery key', async () => {
+    const { setupResetSchema } = await import('@/lib/validation')
+    assert.throws(() => setupResetSchema.parse({ resetKey: 'short' }))
+    const ok = setupResetSchema.parse({ resetKey: 'bk-7Kd93mQx2vLp8sR5tW1nZ4yA6bC0eF' })
+    assert.equal(ok.resetKey, 'bk-7Kd93mQx2vLp8sR5tW1nZ4yA6bC0eF')
+  })
+  test('setupSchema accepts optional claimToken', async () => {
+    const { setupSchema } = await import('@/lib/validation')
+    const base = { name: 'Owner', email: 'o@p.in', password: 'Passw0rd1' }
+    assert.equal(setupSchema.parse(base).claimToken, undefined)
+    assert.equal(setupSchema.parse({ ...base, claimToken: 'a'.repeat(20) }).claimToken, 'a'.repeat(20))
+  })
+})

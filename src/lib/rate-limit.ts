@@ -98,7 +98,7 @@ export const RATE_LIMITS = {
   register: { max: 30, windowMs: 60 * 60 * 1000 },
   authEmail: { max: 12, windowMs: 60 * 60 * 1000 },
   authReset: { max: 12, windowMs: 60 * 60 * 1000 },
-  transfer: { max: 6, windowMs: 60 * 60 * 1000 },
+  transfer: { max: 20, windowMs: 60 * 60 * 1000 },
   transferAccept: { max: 10, windowMs: 60 * 60 * 1000 },
   setupReset: { max: 5, windowMs: 15 * 60 * 1000 },
 }

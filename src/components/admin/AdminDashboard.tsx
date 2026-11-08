@@ -58,7 +58,7 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
   const [selfEmail, setSelfEmail] = useState(user.email)
   const [superNoticeOpen, setSuperNoticeOpen] = useState(notice === 'super-only')
   // Live plan clock: plan name + expiry fed by the subscription API.
-  const [planInfo, setPlanInfo] = useState<{ planName: string; status: string; expiresAt: string | null } | null>(null)
+  const [planInfo, setPlanInfo] = useState<{ planName: string; status: string; expiresAt: string | null; startsAt: string | null } | null>(null)
   // White-label: the shop's own name is the app name everywhere (tab title too).
   useEffect(() => { document.title = `${shop.name} — Dashboard` }, [shop.name])
   // Plan expiry watch: warn from 7 days before the subscription ends.
@@ -67,7 +67,7 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
     fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
       const sub = d?.subscription
       if (!sub) return
-      setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null })
+      setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null, startsAt: sub.startsAt || null })
       if (!sub?.expiresAt || !['ACTIVE', 'PENDING_VERIFICATION'].includes(sub.status)) return
       const ms = new Date(sub.expiresAt).getTime() - Date.now()
       const daysLeft = Math.ceil(ms / 86400000)
@@ -78,7 +78,7 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
       fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
         const sub = d?.subscription
         if (!sub) return
-        setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null })
+        setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null, startsAt: sub.startsAt || null })
       }).catch(() => {})
     }, 60000)
     return () => clearInterval(t)
@@ -119,7 +119,7 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
       </header>
 
       <div className="container mx-auto px-3 sm:px-4 py-4">
-        {planInfo && <PlanClock planName={planInfo.planName} status={planInfo.status} expiresAt={planInfo.expiresAt} />}
+        {planInfo && <PlanClock planName={planInfo.planName} status={planInfo.status} expiresAt={planInfo.expiresAt} startsAt={planInfo.startsAt} />}
         {superNoticeOpen && (
           <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <div className="flex items-start gap-2">

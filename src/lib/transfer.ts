@@ -75,7 +75,7 @@ export async function initiateTransfer(opts: {
       actorType: 'USER',
       action: 'AUTHORITY_TRANSFER_DENIED',
       entity: 'AuthorityTransfer',
-      meta: { scope, reason: 'bad_password' },
+      meta: { scope: opts.scope, reason: 'bad_password' },
       ip: opts.ip,
     })
     throw new HttpError(401, 'Password incorrect — transfer aborted')
@@ -90,7 +90,7 @@ export async function initiateTransfer(opts: {
   // One pending transfer per scope at a time — a newer request supersedes.
   await db.authorityTransfer.updateMany({
     where: {
-      scope,
+      scope: opts.scope,
       status: 'PENDING',
       ...(opts.scope === 'SHOP' ? { shopId: opts.shopId } : { fromUserId: opts.fromUserId }),
     },
@@ -140,7 +140,7 @@ export async function initiateTransfer(opts: {
     actorType: 'USER',
     action: 'AUTHORITY_TRANSFER_INITIATED',
     entity: 'AuthorityTransfer',
-    meta: { scope, toEmail, toName: opts.toName, expiresAt: expiresAt.toISOString() },
+    meta: { scope: opts.scope, toEmail, toName: opts.toName, expiresAt: expiresAt.toISOString() },
     ip: opts.ip,
   })
   return { sent: true, expiresAt: expiresAt.toISOString() }
@@ -272,7 +272,7 @@ export async function acceptTransfer(token: string, password: string, name: stri
   })
 
   return {
-    scope: transfer.scope,
+    scope: transfer.scope as TransferScope,
     shopId: result.shop?.id ?? null,
     shopSlug: result.shop?.slug ?? null,
     userId: result.newUser.id,

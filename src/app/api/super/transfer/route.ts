@@ -3,7 +3,7 @@
 // POST   — initiate: own password confirmed, one-time email link to the new owner
 // DELETE — cancel a pending transfer
 import { db } from '@/lib/db'
-import { handleRoute, jsonOk } from '@/lib/api'
+import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
 import { transferInitiateSchema } from '@/lib/validation'
 import { getClientIp } from '@/lib/security'
