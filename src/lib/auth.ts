@@ -36,6 +36,11 @@ export async function getAuthedUser(): Promise<AuthedContext | null> {
     include: { user: true },
   })
   if (!session || session.revokedAt || session.expiresAt < new Date() || !session.user.isActive) return null
+  // Daily-expiry policy, enforced retroactively: a session is only valid within
+  // sessionTtlMs (24h) of its creation, regardless of the stored expiresAt.
+  // Sessions issued before this policy (30-day TTL deployments) die instantly
+  // instead of lingering for weeks on a forgotten PC or phone.
+  if (session.createdAt.getTime() + LIMITS.sessionTtlMs < Date.now()) return null
   return {
     user: {
       id: session.user.id,

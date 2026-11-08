@@ -8,6 +8,9 @@
 //   - RateLimitEntry  windows already expired (limiter hygiene)
 //   - PasswordResetOtp expired or consumed more than 24h ago
 //   - CustomerSession not seen for 180 days (stale guest sessions)
+//   - Session         expired/revoked more than 24h ago (daily-expiry policy
+//                     hygiene — dead tokens never accumulate)
+//   - AuthorityTransfer dead for 7 days (completed/cancelled/expired links)
 //
 // Auth: same pattern as plan-reminders — Vercel Cron `Authorization: Bearer
 // $CRON_SECRET`, or manual with ?secret= (CRON_SECRET or APP_SECRET).
@@ -29,8 +32,9 @@ export async function GET(req: Request) {
   const d90 = new Date(now.getTime() - 90 * 86400000)
   const d180 = new Date(now.getTime() - 180 * 86400000)
   const d1 = new Date(now.getTime() - 86400000)
+  const d7 = new Date(now.getTime() - 7 * 86400000)
 
-  const [audit, events, notes, rl, otps, sessions] = await Promise.all([
+  const [audit, events, notes, rl, otps, sessions, adminSessions, transfers] = await Promise.all([
     db.auditLog.deleteMany({ where: { createdAt: { lt: d90 } } }).catch(() => null),
     db.printEvent.deleteMany({ where: { createdAt: { lt: d90 } } }).catch(() => null),
     db.notification.deleteMany({ where: { createdAt: { lt: d90 } } }).catch(() => null),
@@ -39,6 +43,12 @@ export async function GET(req: Request) {
       .deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { consumedAt: { lt: d1 } }] } })
       .catch(() => null),
     db.customerSession.deleteMany({ where: { lastSeenAt: { lt: d180 } } }).catch(() => null),
+    // Self-healing for the daily-expiry session policy: dead admin sessions are
+    // swept a day after they stop being valid.
+    db.session.deleteMany({ where: { OR: [{ expiresAt: { lt: d1 } }, { revokedAt: { lt: d1 } }] } }).catch(() => null),
+    db.authorityTransfer
+      .deleteMany({ where: { status: { not: 'PENDING' }, updatedAt: { lt: d7 } } })
+      .catch(() => null),
   ])
 
   const count = (r: { count: number } | null) => (r ? r.count : -1)
@@ -50,6 +60,8 @@ export async function GET(req: Request) {
       rateLimitEntries: count(rl),
       passwordResetOtps: count(otps),
       staleCustomerSessions: count(sessions),
+      deadAdminSessions: count(adminSessions),
+      deadTransfers: count(transfers),
     },
     ranAt: now.toISOString(),
   })

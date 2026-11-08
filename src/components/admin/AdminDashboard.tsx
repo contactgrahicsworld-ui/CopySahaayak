@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
+import { AuthorityTransferCard } from '@/components/AuthorityTransferCard'
 import { PlanClock } from '@/components/admin/PlanClock'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
@@ -1287,6 +1288,8 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
           </form>
         </CardContent>
       </Card>
+
+      <AuthorityTransferCard scope="SHOP" apiBase="/api/admin/transfer" />
 
       <Card>
         <CardHeader className="pb-2">

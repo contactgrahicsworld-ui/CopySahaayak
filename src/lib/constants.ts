@@ -40,8 +40,15 @@ export const LIMITS = {
   deviceDownloadTtlMs: 30 * 60 * 1000, // 30 min for connector downloads
   claimLeaseMs: 10 * 60 * 1000, // print job claim lease
   pairingCodeTtlMs: 15 * 60 * 1000,
-  sessionTtlMs: 30 * 24 * 3600 * 1000, // admin sessions: 30 days
+  // Admin sessions expire DAILY (roz): a session logged in on a shared PC or
+  // phone dies after 24h, so a forgotten login can never be reused by someone
+  // else — the next day the owner simply signs in again with ID + password.
+  // getAuthedUser() also enforces this retroactively via createdAt, so sessions
+  // issued by older deployments cannot outlive the policy.
+  sessionTtlMs: 24 * 3600 * 1000, // admin sessions: 1 day
   customerSessionTtlMs: 7 * 24 * 3600 * 1000,
+  // Authority-transfer (Power of Attorney) email-link validity.
+  transferTtlMs: 24 * 3600 * 1000,
 }
 
 export const COOKIES = {

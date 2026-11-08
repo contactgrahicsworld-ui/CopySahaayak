@@ -64,6 +64,7 @@ model User {
   auditLogs    AuditLog[]
   verifiedPayments       Payment[]
   verifiedSubPayments    SubscriptionPayment[]
+  transfersInitiated     AuthorityTransfer[] @relation("TransfersInitiated")
 
   @@index([role])
   @@schema("csp")
@@ -133,8 +134,41 @@ model Shop {
   auditLogs         AuditLog[]
   notifications     Notification[]
   weeklyReports     WeeklyReport[]
+  authorityTransfers AuthorityTransfer[] @relation("ShopAuthorityTransfers")
 
   @@index([isActive])
+  @@schema("csp")
+}
+
+// ============ AUTHORITY TRANSFER (POWER OF ATTORNEY) ============
+// A current authority (shop owner or the platform super admin) hands over the
+// COMPLETE dashboard authority to a new person by email. The link emailed to
+// the new person works like a password-reset mail: whoever holds the link can
+// set their own password ONCE within the validity window and instantly receives
+// the full authority (same shop / same platform). The previous authority is
+// deactivated and every one of their sessions is revoked on acceptance.
+model AuthorityTransfer {
+  id             String    @id @default(cuid())
+  tokenHash      String    @unique // sha256 of the single-use link token
+  scope          String // SHOP | PLATFORM
+  shopId         String?
+  shop           Shop?     @relation("ShopAuthorityTransfers", fields: [shopId], references: [id], onDelete: Cascade)
+  fromUserId     String?
+  fromUser       User?     @relation("TransfersInitiated", fields: [fromUserId], references: [id], onDelete: SetNull)
+  fromEmail      String // snapshot of the previous authority's email
+  toEmail        String // who receives the authority
+  toName         String
+  status         String    @default("PENDING") // PENDING | COMPLETED | CANCELLED | EXPIRED
+  expiresAt      DateTime // link validity (24h)
+  acceptedAt     DateTime?
+  newUserId      String? // the user created/reactivated on acceptance
+  ip             String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([toEmail])
+  @@index([status])
+  @@index([shopId])
   @@schema("csp")
 }
 

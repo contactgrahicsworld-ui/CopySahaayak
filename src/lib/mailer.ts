@@ -149,3 +149,59 @@ export function otpEmailTemplate(code: string, purpose: 'reset' = 'reset'): { su
 </div></body></html>`
   return { subject, text, html }
 }
+
+// ---- Authority transfer (Power of Attorney) ----
+// The emailed link behaves like a password-set mail: it grants the COMPLETE
+// authority (shop dashboard or the whole platform) to whoever opens it within
+// the validity window and sets their own password.
+
+export interface TransferEmailInput {
+  toName: string
+  fromName: string
+  fromEmail: string
+  scope: 'SHOP' | 'PLATFORM'
+  shopName?: string | null
+  link: string
+  expiresInHours: number
+}
+
+export function transferEmailTemplate(i: TransferEmailInput): { subject: string; text: string; html: string } {
+  const what = i.scope === 'PLATFORM'
+    ? 'the complete CopySahaayak PLATFORM authority (Super Admin)'
+    : `the complete authority of the photocopy shop "${i.shopName}" (dashboard, orders, payments)`
+  const subjectHi = i.scope === 'PLATFORM'
+    ? 'CopySahaayak platform authority transfer / अधिकार हस्तांतरण'
+    : `CopySahaayak shop authority transfer — ${i.shopName} / दुकान अधिकार हस्तांतरण`
+  const text = [
+    `Hello ${i.toName},`,
+    '',
+    `${i.fromName} (${i.fromEmail}) has transferred ${what} to you on CopySahaayak.`,
+    '',
+    'Open this one-time link to ACCEPT and set your own password:',
+    '',
+    i.link,
+    '',
+    `This link works once and expires in ${i.expiresInHours} hours. Until you accept, the current authority keeps working as before.`,
+    '',
+    'If you were not expecting this, simply ignore the email — nothing changes on its own.',
+    '',
+    '---',
+    `नमस्ते ${i.toName},`,
+    '',
+    `${i.fromName} ने आपको CopySahaayak पर ${i.scope === 'PLATFORM' ? 'पूरी platform की Super Admin अधिकार' : `"${i.shopName}" दुकान की पूरी अधिकार`} सौंपी है।`,
+    'ऊपर दिए गए लिंक को खोलकर अपना नया पासवर्ड बनाएं — तुरंत पूरा डैशबोर्ड आपके पास आ जाएगा (Power of Attorney जैसा पूर्ण अधिकार)।',
+    `लिंक एक बार चलता है और ${i.expiresInHours} घंटे में समाप्त हो जाएगा। यह ईमेल अपेक्षित नहीं था तो इसे ignore करें — जब तक आप accept नहीं करते, कुछ नहीं बदलता।`,
+  ].join('\n')
+  const html = `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;background:#f6f7f9;padding:24px">
+<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:12px;padding:28px;border:1px solid #e5e7eb">
+<h2 style="margin:0 0 8px;color:#111827">CopySahaayak — Authority Transfer</h2>
+<p style="color:#374151;font-size:15px">Hello <strong>${i.toName}</strong>,</p>
+<p style="color:#374151;font-size:15px"><strong>${i.fromName}</strong> (<span style="color:#6b7280">${i.fromEmail}</span>) has transferred
+<strong>${what}</strong> to you.</p>
+<p style="margin:20px 0"><a href="${i.link}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600">Accept authority &amp; set password</a></p>
+<p style="color:#374151;font-size:14px">या यह लिंक ब्राउज़र में खोलें:<br><span style="word-break:break-all;color:#2563eb;font-size:12px">${i.link}</span></p>
+<p style="color:#6b7280;font-size:13px">One-time link • expires in ${i.expiresInHours} hours • लिंक एक बार चलेगा, ${i.expiresInHours} घंटे में समाप्त।</p>
+<p style="color:#9ca3af;font-size:12px">अपेक्षित नहीं था? इस ईमेल को ignore करें — जब तक आप accept नहीं करते कुछ नहीं बदलता। / If you were not expecting this, ignore it — nothing changes until you accept.</p>
+</div></body></html>`
+  return { subject: subjectHi, text, html }
+}

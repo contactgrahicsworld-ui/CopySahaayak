@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
+import { AuthorityTransferCard } from '@/components/AuthorityTransferCard'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
@@ -75,7 +76,7 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
           <TabsContent value="subs"><SubsTab /></TabsContent>
           <TabsContent value="plans"><PlansTab /></TabsContent>
           <TabsContent value="audit"><AuditTab /></TabsContent>
-          <TabsContent value="settings"><div className="space-y-4"><PlatformSettingsTab /><PlatformOwnershipCard /></div></TabsContent>
+          <TabsContent value="settings"><div className="space-y-4"><PlatformSettingsTab /><AuthorityTransferCard scope="PLATFORM" apiBase="/api/super/transfer" /><PlatformOwnershipCard /></div></TabsContent>
         </Tabs>
       </div>
 

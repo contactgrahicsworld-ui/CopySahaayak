@@ -5,18 +5,26 @@
 // SUPER_ADMIN exists (GET /api/setup → setupDone:false), and locks forever after.
 // This page is for the PLATFORM OWNER ONLY — shop owners register via the
 // "Shop Owner" entry on the home page (/register), never here.
+//
+// Emergency recovery: if the platform ALREADY had a super admin whose credentials
+// are lost (recoveryRequired:true), creation needs a one-time CLAIM TOKEN. The
+// platform owner enters the deployment's SUPER_SETUP_RESET_KEY below — it never
+// leaves this page — and the server issues the 15-minute claim token that
+// unlocks exactly ONE fresh creation. Old credentials are deleted on reset.
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ShieldCheck, Loader2 } from 'lucide-react'
+import { ShieldCheck, Loader2, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
 export default function SetupPage() {
   const [checking, setChecking] = useState(true)
   const [locked, setLocked] = useState(false)
+  const [recoveryRequired, setRecoveryRequired] = useState(false)
+  const [claimToken, setClaimToken] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,17 +33,41 @@ export default function SetupPage() {
   const [upiVpa, setUpiVpa] = useState('')
   const [upiPayeeName, setUpiPayeeName] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resetKey, setResetKey] = useState('')
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
-    // /api/setup responds { setupDone: boolean } at the top level.
+    // /api/setup responds { setupDone, recoveryRequired } at the top level.
     fetch('/api/setup')
       .then((r) => r.json())
       .then((d) => {
         if (d?.setupDone) setLocked(true)
+        if (d?.recoveryRequired) setRecoveryRequired(true)
       })
       .catch(() => {})
       .finally(() => setChecking(false))
   }, [])
+
+  async function runRecovery(e: React.FormEvent) {
+    e.preventDefault()
+    setResetting(true)
+    try {
+      const res = await fetch('/api/setup/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetKey }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Recovery failed')
+      setClaimToken(d.claimToken)
+      setRecoveryRequired(false)
+      toast.success('पुराना Super Admin हटा दिया गया — अब नया account बनाएं / Old super admin removed. Create the new account now.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Recovery failed')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -55,6 +87,7 @@ export default function SetupPage() {
           phone: phone || undefined,
           upiVpa: upiVpa || undefined,
           upiPayeeName: upiPayeeName || undefined,
+          ...(claimToken ? { claimToken } : {}),
         }),
       })
       const data = await res.json()
@@ -98,6 +131,46 @@ export default function SetupPage() {
     )
   }
 
+  // ---- Emergency recovery gate: the platform had a super admin before, so
+  // creation needs the one-time claim token from the break-glass reset. ----
+  if (recoveryRequired && !claimToken) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4 py-8 bg-muted/30">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center">
+            <KeyRound className="h-8 w-8 mx-auto mb-2" aria-hidden />
+            <CardTitle className="text-xl">Emergency recovery / आपातकालीन रिकवरी</CardTitle>
+            <CardDescription>
+              पुराना Super Admin credential खो गया है? नीचे deployment की recovery key
+              (<code className="text-[11px]">SUPER_SETUP_RESET_KEY</code>) डालें — पुराना account पूरी तरह हट जाएगा और नया बनाने की अनुमति 15 मिनट के लिए मिलेगी।
+              <br />
+              Lost the platform owner credentials? Enter the recovery key to delete the old super admin and unlock one-time creation.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={runRecovery} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="resetKey">Recovery key</Label>
+                <Input id="resetKey" type="password" required autoComplete="off" value={resetKey} onChange={(e) => setResetKey(e.target.value)} placeholder="SUPER_SETUP_RESET_KEY value" />
+              </div>
+              <Button type="submit" className="w-full" variant="destructive" disabled={resetting || resetKey.length < 16}>
+                {resetting && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Remove old admin &amp; unlock creation
+              </Button>
+            </form>
+            <p className="text-xs text-muted-foreground mt-4 text-center">
+              Recovery key सिर्फ़ platform owner के पास होती है (server environment variable) — यह कभी डेटाबेस में नहीं रहती।
+              <br />
+              Shops और dukaan ka data is process se untouched rehta hai.
+              <br />
+              <Link href="/super/login" className="underline">Super Admin sign in</Link> ·
+              <Link href="/" className="underline"> Back to home</Link>
+            </p>
+          </CardContent>
+        </Card>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-8 bg-muted/30">
       <Card className="w-full max-w-lg">
@@ -105,7 +178,9 @@ export default function SetupPage() {
           <ShieldCheck className="h-8 w-8 mx-auto mb-2" aria-hidden />
           <CardTitle className="text-xl">Super Admin account creation</CardTitle>
           <CardDescription>
-            Create the one platform-owner account. This page works only once — after this it locks permanently.
+            {claimToken
+              ? 'Recovery unlocked — create the brand-new platform owner account. The old credentials are gone.'
+              : 'Create the one platform-owner account. This page works only once — after this it locks permanently.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -113,6 +188,11 @@ export default function SetupPage() {
             Ye page <b>sirf platform owner (Super Admin)</b> ke liye hai — yahan dukaan owner account nahi banta.
             Dukaan register karne ke liye home page par <b>“Shop Owner”</b> button use karein.
           </p>
+          {claimToken && (
+            <p className="mb-3 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-xs text-green-900">
+              रिकवरी सफल — पुराना Super Admin credential हटा दिया गया है (purana data/credential removed)। अब बिल्कुल नया account बनाएं।
+            </p>
+          )}
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="name">Your name</Label>

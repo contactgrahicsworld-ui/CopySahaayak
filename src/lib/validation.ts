@@ -160,6 +160,28 @@ export const setupSchema = z.object({
     .optional()
     .or(z.literal('')),
   upiPayeeName: z.string().trim().max(60).optional(),
+  // After an emergency credential reset the one-time setup page only accepts a
+  // claim token issued by POST /api/setup/reset (never a public re-open).
+  claimToken: z.string().trim().min(16).max(200).optional(),
+})
+
+// Break-glass recovery: the deployment's SUPER_SETUP_RESET_KEY env value must be
+// presented. Without the key this endpoint is indistinguishable from 404.
+export const setupResetSchema = z.object({
+  resetKey: z.string().min(16).max(200),
+})
+
+// Authority transfer (Power of Attorney) initiation: the CURRENT authority
+// confirms their own password, then the new person gets a one-time email link.
+export const transferInitiateSchema = z.object({
+  toName: z.string().trim().min(2, 'Enter the new authority\'s name').max(80),
+  toEmail: z.string().trim().email().max(120),
+  currentPassword: z.string().min(1).max(200),
+})
+
+export const transferAcceptSchema = z.object({
+  password: newPasswordSchema,
+  name: z.string().trim().min(2).max(80).optional(),
 })
 
 export const registerSchema = z.object({
