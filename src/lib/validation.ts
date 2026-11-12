@@ -141,6 +141,14 @@ export const superResetPasswordSchema = z.object({
   newPassword: newPasswordSchema,
 })
 
+// Super Admin DELETE (Users tab): password of the CALLER confirms the action —
+// a stolen session alone must never delete a platform owner. Target must be a
+// SUPER_ADMIN; deleting the last active one re-opens the one-time /setup.
+export const superDeleteUserSchema = z.object({
+  userId: z.string().trim().min(10).max(60),
+  password: z.string().min(1).max(200),
+})
+
 // Platform admin handover: the active super admin deactivates THEMSELVES with
 // password confirmation (re-opens one-time /setup for a fresh platform admin).
 export const superHandoverSchema = z.object({

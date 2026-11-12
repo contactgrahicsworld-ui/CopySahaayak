@@ -5,7 +5,7 @@
 import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
-import { superResetPasswordSchema, superHandoverSchema } from '@/lib/validation'
+import { superResetPasswordSchema, superHandoverSchema, superDeleteUserSchema } from '@/lib/validation'
 import { bcryptHash, bcryptCompare, getClientIp } from '@/lib/security'
 import { audit } from '@/lib/audit'
 
@@ -64,6 +64,74 @@ export async function POST(req: Request) {
       ip: getClientIp(req),
     })
     return jsonOk({ ok: true })
+  })
+}
+
+// DELETE a SUPER_ADMIN account (Users tab "Delete" button — "at a time 1 hi
+// admin ho"). The CALLER's own password confirms the action, so a stolen
+// session alone can never delete a platform owner. Rules:
+//  - target must be a SUPER_ADMIN (shop users are managed from the Shops tab)
+//  - deleting ANOTHER super keeps the caller as the single remaining admin
+//  - deleting YOURSELF as the last active super returns the platform to the
+//    one-time /setup recovery state (same break-glass contract as the reset:
+//    platform UPI cleared, pending platform transfers cancelled, shops and all
+//    business data untouched) — the owner then self-creates a fresh account
+export async function DELETE(req: Request) {
+  return handleRoute(req, {}, async () => {
+    const ctx = await requireSuper()
+    const body = superDeleteUserSchema.parse(await req.json())
+
+    const target = await db.user.findUnique({ where: { id: body.userId } })
+    if (!target) return jsonError(404, 'User not found')
+    if (target.role !== 'SUPER_ADMIN') {
+      return jsonError(400, 'Only Super Admin accounts are deleted here. Shop users are managed from the Shops tab.')
+    }
+
+    const caller = await db.user.findUnique({ where: { id: ctx.user.id } })
+    if (!caller) return jsonError(401, 'Session user not found')
+    const passwordOk = await bcryptCompare(body.password, caller.passwordHash)
+    if (!passwordOk) {
+      await audit({
+        userId: ctx.user.id,
+        actorType: 'USER',
+        action: 'SUPER_ADMIN_DELETE_DENIED',
+        entity: 'User',
+        entityId: target.id,
+        ip: getClientIp(req),
+      })
+      return jsonError(401, 'Password incorrect — delete aborted')
+    }
+
+    const isSelf = target.id === ctx.user.id
+    const activeSupers = await db.user.count({ where: { role: 'SUPER_ADMIN', isActive: true } })
+    // The deleted account is the last ACTIVE platform owner → /setup re-opens.
+    const lastActive = target.isActive && activeSupers <= 1
+
+    await db.$transaction(async (tx) => {
+      // Full removal: the account row goes away and sessions cascade with it;
+      // audit history survives via SET NULL, shops are never touched.
+      await tx.user.delete({ where: { id: target.id } })
+      if (lastActive) {
+        await tx.platformSetting.upsert({ where: { key: 'super_admin_upi_vpa' }, update: { value: '' }, create: { key: 'super_admin_upi_vpa', value: '' } })
+        await tx.platformSetting.upsert({ where: { key: 'super_admin_payee_name' }, update: { value: 'CopySahaayak Platforms' }, create: { key: 'super_admin_payee_name', value: 'CopySahaayak Platforms' } })
+        await tx.authorityTransfer.updateMany({ where: { scope: 'PLATFORM', status: 'PENDING' }, data: { status: 'CANCELLED' } })
+      } else {
+        // A remaining owner exists: only transfers initiated by the deleted
+        // account become meaningless and are cancelled.
+        await tx.authorityTransfer.updateMany({ where: { scope: 'PLATFORM', status: 'PENDING', fromUserId: target.id }, data: { status: 'CANCELLED' } })
+      }
+    })
+
+    await audit({
+      userId: isSelf ? null : ctx.user.id, // self-delete: row gone → SET NULL keeps history
+      actorType: 'USER',
+      action: 'SUPER_ADMIN_DELETED',
+      entity: 'User',
+      entityId: target.id,
+      meta: { targetEmail: target.email, self: isSelf, lastActiveAdmin: lastActive },
+      ip: getClientIp(req),
+    })
+    return jsonOk({ ok: true, selfDeleted: isSelf, setupReopened: lastActive })
   })
 }
 

@@ -72,7 +72,7 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
           </TabsList>
           <TabsContent value="overview"><OverviewTab /></TabsContent>
           <TabsContent value="shops"><ShopsTab /></TabsContent>
-          <TabsContent value="users"><UsersTab /></TabsContent>
+          <TabsContent value="users"><UsersTab selfEmail={selfEmail} /></TabsContent>
           <TabsContent value="subs"><SubsTab /></TabsContent>
           <TabsContent value="plans"><PlansTab /></TabsContent>
           <TabsContent value="audit"><AuditTab /></TabsContent>
@@ -442,14 +442,20 @@ interface UserRow {
   shop: { id: string; name: string; slug: string } | null
 }
 
-function UsersTab() {
+function UsersTab({ selfEmail }: { selfEmail: string }) {
   const { toast } = useToast()
+  const router = useRouter()
   const [users, setUsers] = useState<UserRow[]>([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
   const [reset, setReset] = useState<UserRow | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
+  // Super Admin delete ("at a time 1 hi admin ho"): password-confirmed, so a
+  // stolen session can never remove a platform owner by itself.
+  const [del, setDel] = useState<UserRow | null>(null)
+  const [delPassword, setDelPassword] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/super/users?q=${encodeURIComponent(q)}`, { cache: 'no-store' })
@@ -483,6 +489,35 @@ function UsersTab() {
     }
   }
 
+  async function submitDelete() {
+    if (!del) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/super/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: del.id, password: delPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Delete failed')
+      setDel(null)
+      setDelPassword('')
+      if (data.selfDeleted) {
+        toast({ title: 'Super Admin deleted', description: data.setupReopened ? 'Platform ab recovery mode me hai — /setup par recovery key se naya account banao.' : 'Account deleted.' })
+        await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+        router.push('/login')
+        router.refresh()
+      } else {
+        toast({ title: `Super Admin deleted — ${del.email}`, description: 'Ab sirf ek hi platform admin hai.' })
+        load()
+      }
+    } catch (err) {
+      toast({ title: 'Delete failed', description: err instanceof Error ? err.message : '', variant: 'destructive' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex gap-2 items-center">
@@ -499,6 +534,7 @@ function UsersTab() {
                 <div className="min-w-0">
                   <p className="font-semibold text-sm">
                     {u.name} <span className="text-muted-foreground font-normal">· {u.email}</span>
+                    {u.email === selfEmail && <span className="ml-1.5 rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-700 align-middle">Aap</span>}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {u.role}{u.shop ? ` · ${u.shop.name} (/s/${u.shop.slug})` : ''} · joined {new Date(u.createdAt).toLocaleDateString('en-IN')}
@@ -507,6 +543,11 @@ function UsersTab() {
                 <div className="flex items-center gap-2">
                   <Badge variant={u.isActive ? 'default' : 'destructive'}>{u.isActive ? 'ACTIVE' : 'DISABLED'}</Badge>
                   <Button size="sm" variant="outline" onClick={() => { setReset(u); setNewPassword('') }}><KeyRound className="h-3.5 w-3.5 mr-1" aria-hidden />Reset password</Button>
+                  {u.role === 'SUPER_ADMIN' && (
+                    <Button size="sm" variant="destructive" onClick={() => { setDel(u); setDelPassword('') }} aria-label={`Delete super admin ${u.email}`}>
+                      <Trash2 className="h-3.5 w-3.5 mr-1" aria-hidden />Delete
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -531,6 +572,29 @@ function UsersTab() {
             <Button variant="outline" onClick={() => setReset(null)}>Cancel</Button>
             <Button onClick={submitReset} disabled={saving || newPassword.length < 8}>
               {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Reset password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!del} onOpenChange={(v) => !v && setDel(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Super Admin — {del?.email}</DialogTitle>
+            <DialogDescription>
+              {del && del.email === selfEmail
+                ? 'Ye AAPKA khud ka account hai. Delete karne par aap sign-out ho jayenge. Agar aap aakhri admin ho to platform recovery mode me chala jayega — /setup par apni recovery key se naya account khud banao. Shops ka data safe rahega.'
+                : 'Is Super Admin ka account PERMANENTLY delete ho jayega (sessions bhi). Aap hi platform ka single admin rahoge.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label>Confirm with YOUR password</Label>
+            <Input type="password" autoComplete="current-password" value={delPassword} onChange={(e) => setDelPassword(e.target.value)} placeholder="aapka apna password" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDel(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={submitDelete} disabled={deleting || !delPassword}>
+              {deleting && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Delete permanently
             </Button>
           </DialogFooter>
         </DialogContent>
