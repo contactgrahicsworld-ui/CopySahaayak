@@ -107,9 +107,20 @@ export async function GET(req: Request) {
     results.push({ shop: sub.shop.name, plan: sub.plan.name, daysLeft, inApp: true, email: emailStatus, whatsapp: whatsappStatus })
   }
 
+  // Status hygiene: proactively flip ACTIVE subscriptions whose window has
+  // passed to EXPIRED. Without this, a shop that never attempts an order keeps
+  // a stale ACTIVE row and the super dashboard would show "ACTIVE until <past
+  // date>". (ensureSubscriptionUsable still blocks expired shops at order time
+  // regardless of status — this keeps the data honest everywhere else.)
+  const expiredFlip = await db.subscription.updateMany({
+    where: { status: 'ACTIVE', expiresAt: { lt: now } },
+    data: { status: 'EXPIRED' },
+  })
+
   return jsonOk({
     checked: subs.length,
     notified: results.length,
+    expiredFlipped: expiredFlip.count,
     channels: { inApp: 'always', email: mailTransport === 'resend' ? 'resend' : 'not-configured', sms: 'not-configured', whatsapp: waConfigured() ? 'cloud-api-templates' : 'not-configured (wa.me links available in dashboard)' },
     results,
     ranAt: now.toISOString(),
