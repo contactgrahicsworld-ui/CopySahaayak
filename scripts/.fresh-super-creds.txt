@@ -1,0 +1,4 @@
+RESET_KEY=bk-2ebc3d80becab4c72edc09b2ca6d2090
+SUPER_EMAIL=super@copysahaayak.local
+SUPER_PASSWORD=PcsSuper#9a8bfbda9A
+SHA=960e20183f84c4692e469ecfc18b302bb9a2786d
