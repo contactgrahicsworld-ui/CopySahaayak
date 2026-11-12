@@ -1,7 +1,9 @@
-// User directory for the platform admin + guaranteed password recovery path.
-// The super admin can reset any user's password — this is the always-available
-// fallback when no email provider is configured, mirroring standard SaaS admin
-// panels. Every action is audit-logged; reset revokes all sessions.
+// Super Admin directory for the platform admin + guaranteed password recovery
+// path. The GET list contains ONLY active SUPER_ADMIN accounts (the Users tab
+// is the platform-owner view; shop users are managed from the Shops tab). The
+// super admin can reset their OWN password here — this is the always-available
+// fallback when no email provider is configured. Every action is audit-logged;
+// reset revokes all sessions.
 import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
@@ -16,8 +18,15 @@ export async function GET(req: Request) {
     await requireSuper()
     const url = new URL(req.url)
     const q = url.searchParams.get('q')?.trim()
+    // Users tab shows ONLY the active platform admin(s) (owner request: "jo
+    // active admin ho wo hi dikhe, baaki total hata do"). Shop owners/staff
+    // belong to the Shops tab and never appear here.
     const users = await db.user.findMany({
-      where: q ? { OR: [{ email: { contains: q } }, { name: { contains: q } }] } : {},
+      where: {
+        role: 'SUPER_ADMIN',
+        isActive: true,
+        ...(q ? { OR: [{ email: { contains: q } }, { name: { contains: q } }] } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 200,
       select: {

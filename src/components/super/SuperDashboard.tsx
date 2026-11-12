@@ -520,8 +520,11 @@ function UsersTab({ selfEmail }: { selfEmail: string }) {
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Is list par sirf platform ka <b>ACTIVE admin (Super Admin)</b> dikhta hai — at a time 1 hi admin hota hai. Dukaan owners aur unke staff <b>Shops tab</b> me hain.
+      </p>
       <div className="flex gap-2 items-center">
-        <Input placeholder="Search users by email or name" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:max-w-xs" />
+        <Input placeholder="Search admin by email or name" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:max-w-xs" />
         <Button variant="outline" size="sm" onClick={load} aria-label="Refresh"><RefreshCw className="h-4 w-4" aria-hidden /></Button>
       </div>
       {loading ? (
@@ -552,7 +555,7 @@ function UsersTab({ selfEmail }: { selfEmail: string }) {
               </CardContent>
             </Card>
           ))}
-          {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No users found.</p>}
+          {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">Koi platform admin nahi mila.</p>}
         </div>
       )}
 
