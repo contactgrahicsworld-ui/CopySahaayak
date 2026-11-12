@@ -148,7 +148,10 @@ export const superHandoverSchema = z.object({
 })
 
 export const setupSchema = z.object({
-  name: z.string().trim().min(2).max(80),
+  // Simple creation page: the owner fills ONLY email + password (+ recovery
+  // key when the platform is locked). Name auto-derives from the email,
+  // phone/UPI are set later from Super Admin → Settings.
+  name: z.string().trim().min(2).max(80).optional(),
   email: z.string().trim().email().max(120),
   password: newPasswordSchema,
   phone: z.string().trim().max(20).optional(),
@@ -160,9 +163,12 @@ export const setupSchema = z.object({
     .optional()
     .or(z.literal('')),
   upiPayeeName: z.string().trim().max(60).optional(),
-  // After an emergency credential reset the one-time setup page only accepts a
-  // claim token issued by POST /api/setup/reset (never a public re-open).
+  // Two-step legacy flow: one-time token issued by POST /api/setup/reset.
   claimToken: z.string().trim().min(16).max(200).optional(),
+  // SIMPLE one-shot flow (owner request: "page complex mat banao"): the owner
+  // pastes their recovery key straight into the creation form and the server
+  // verifies it + does reset+create in ONE atomic transaction.
+  resetKey: z.string().trim().min(16).max(200).optional(),
 })
 
 // Break-glass recovery: the deployment's SUPER_SETUP_RESET_KEY env value must be
