@@ -1,16 +1,19 @@
 'use client'
 
 // First-run platform setup: the FIRST Super Admin creates their own account here.
-// No credentials ship with the app — this page is only reachable while no active
-// SUPER_ADMIN exists (GET /api/setup → setupDone:false), and locks forever after.
-// This page is for the PLATFORM OWNER ONLY — shop owners register via the
-// "Shop Owner" entry on the home page (/register), never here.
+// No credentials ship with the app, no script fills them — the platform owner
+// types their own name/email/password on this page. This page is only reachable
+// while no active SUPER_ADMIN exists (GET /api/setup → setupDone:false), and
+// locks forever after. This page is for the PLATFORM OWNER ONLY — shop owners
+// register via the "Shop Owner" entry on the home page (/register), never here.
 //
 // Emergency recovery: if the platform ALREADY had a super admin whose credentials
-// are lost (recoveryRequired:true), creation needs a one-time CLAIM TOKEN. The
-// platform owner enters the deployment's SUPER_SETUP_RESET_KEY below — it never
-// leaves this page — and the server issues the 15-minute claim token that
-// unlocks exactly ONE fresh creation. Old credentials are deleted on reset.
+// are lost, creation needs a one-time CLAIM TOKEN. The platform owner enters the
+// deployment's SUPER_SETUP_RESET_KEY below — it never leaves this page — and the
+// server issues the 15-minute claim token that unlocks exactly ONE fresh
+// creation. Old credentials are deleted on reset. The recovery entry stays
+// available from the locked screen too, so a lost password is always
+// self-recoverable without any support ticket.
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,6 +38,9 @@ export default function SetupPage() {
   const [loading, setLoading] = useState(false)
   const [resetKey, setResetKey] = useState('')
   const [resetting, setResetting] = useState(false)
+  // Recovery must stay reachable even when a super admin exists (locked screen):
+  // a lost password is recovered by the OWNER here, never by a preset credential.
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
 
   useEffect(() => {
     // /api/setup responds { setupDone, recoveryRequired } at the top level.
@@ -61,6 +67,8 @@ export default function SetupPage() {
       if (!res.ok) throw new Error(d.error || 'Recovery failed')
       setClaimToken(d.claimToken)
       setRecoveryRequired(false)
+      setLocked(false)
+      setRecoveryOpen(false)
       toast.success('पुराना Super Admin हटा दिया गया — अब नया account बनाएं / Old super admin removed. Create the new account now.')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Recovery failed')
@@ -110,7 +118,7 @@ export default function SetupPage() {
     )
   }
 
-  if (locked) {
+  if (locked && !claimToken) {
     return (
       <main className="min-h-screen flex items-center justify-center px-4 bg-muted/30">
         <Card className="w-full max-w-sm">
@@ -125,6 +133,16 @@ export default function SetupPage() {
             <Button asChild className="w-full">
               <Link href="/super/login">Go to Super Admin sign in</Link>
             </Button>
+            <div className="mt-5 border-t pt-4">
+              <p className="text-xs text-muted-foreground mb-2">Super Admin credentials kho gaye?</p>
+              <Button variant="outline" className="w-full" onClick={() => setRecoveryOpen(true)}>
+                <KeyRound className="h-4 w-4 mr-2" aria-hidden />
+                Emergency recovery kholein
+              </Button>
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Recovery key (SUPER_SETUP_RESET_KEY) se purana credential हटकर आप KHUD naya email/password bana sakte hain.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </main>
@@ -133,7 +151,7 @@ export default function SetupPage() {
 
   // ---- Emergency recovery gate: the platform had a super admin before, so
   // creation needs the one-time claim token from the break-glass reset. ----
-  if (recoveryRequired && !claimToken) {
+  if ((recoveryRequired || recoveryOpen) && !claimToken) {
     return (
       <main className="min-h-screen flex items-center justify-center px-4 py-8 bg-muted/30">
         <Card className="w-full max-w-lg">
