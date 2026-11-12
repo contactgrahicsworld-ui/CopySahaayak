@@ -86,3 +86,10 @@ connector/**/obj/
 connector/publish/
 download/connector/
 prisma/*.pg-backup
+
+# cron-agent auto-commit guard
+.device-code
+.user-code
+.deploy-log.txt
+.token-response
+.no-deploy-*
