@@ -6,7 +6,14 @@
 // Colour shifts to amber in the last 7 days and red once expired, with a
 // clear "renew" call-out. The owner always knows exactly how long the plan
 // will run — at a glance, on mobile and desktop.
-import { useEffect, useState } from 'react'
+//
+// Time source: the API's serverNow is the single source of truth. A visitor's
+// device clock can be wrong (manual date, dead battery, timezone fiddling) and
+// a device-clock countdown would then show a wrong "बाकी" time even though the
+// plan data is perfect. So we anchor to serverNow, measure the device skew
+// once, and tick locally with the skew applied; every dashboard refetch (60s)
+// re-syncs the skew automatically.
+import { useEffect, useRef, useState } from 'react'
 import { Timer, CalendarClock } from 'lucide-react'
 
 function istParts(d: Date): { date: string; time: string } {
@@ -50,17 +57,26 @@ export function PlanClock({
   status,
   expiresAt,
   startsAt,
+  serverNow,
 }: {
   planName: string
   status: string
   expiresAt: string | null
   startsAt?: string | null
+  /** Authoritative server timestamp (ISO) from the subscription API. */
+  serverNow?: string | null
 }) {
-  const [now, setNow] = useState(() => new Date())
+  // Device-skew = serverNow − deviceNow, recomputed each time the API answers.
+  const skewRef = useRef<number>(serverNow ? new Date(serverNow).getTime() - Date.now() : 0)
+  // First paint already uses server time (dashboard renders this only after
+  // the subscription fetch resolves, so serverNow is always present).
+  const [now, setNow] = useState<Date>(() => (serverNow ? new Date(serverNow) : new Date()))
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000)
+    if (serverNow) skewRef.current = new Date(serverNow).getTime() - Date.now()
+    setNow(new Date(Date.now() + skewRef.current))
+    const t = setInterval(() => setNow(new Date(Date.now() + skewRef.current)), 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [serverNow])
 
   const cur = istParts(now)
   let msLeft = 0

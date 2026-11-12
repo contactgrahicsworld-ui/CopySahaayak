@@ -25,13 +25,19 @@ export async function GET(req: Request) {
       include: { plan: { select: { name: true, code: true } } },
     })
     const s = await settings.all()
-    return jsonOk({
-      subscription,
-      plans: plans.map((p) => ({ ...p, features: JSON.parse(p.featuresJson || '[]') })),
-      payments,
-      superAdminUpi: s.super_admin_upi_vpa || '',
-      superAdminPayee: s.super_admin_payee_name || 'Platform',
-    })
+    return jsonOk(
+      {
+        // Authoritative server timestamp: the client clock can be wrong, so
+        // countdowns anchor to this and tick locally (see PlanClock).
+        serverNow: new Date().toISOString(),
+        subscription,
+        plans: plans.map((p) => ({ ...p, features: JSON.parse(p.featuresJson || '[]') })),
+        payments,
+        superAdminUpi: s.super_admin_upi_vpa || '',
+        superAdminPayee: s.super_admin_payee_name || 'Platform',
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   })
 }
 

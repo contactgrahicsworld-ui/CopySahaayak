@@ -58,28 +58,29 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
   const [selfEmail, setSelfEmail] = useState(user.email)
   const [superNoticeOpen, setSuperNoticeOpen] = useState(notice === 'super-only')
   // Live plan clock: plan name + expiry fed by the subscription API.
-  const [planInfo, setPlanInfo] = useState<{ planName: string; status: string; expiresAt: string | null; startsAt: string | null } | null>(null)
+  // serverNow rides along so the countdown is anchored to SERVER time —
+  // a device with a wrong clock must never show a wrong plan timer.
+  const [planInfo, setPlanInfo] = useState<{ planName: string; status: string; expiresAt: string | null; startsAt: string | null; serverNow: string | null } | null>(null)
   // White-label: the shop's own name is the app name everywhere (tab title too).
   useEffect(() => { document.title = `${shop.name} — Dashboard` }, [shop.name])
   // Plan expiry watch: warn from 7 days before the subscription ends.
   const [expiry, setExpiry] = useState<{ planName: string; expiresAt: string; daysLeft: number } | null>(null)
   useEffect(() => {
-    fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+    const apply = (d: { subscription?: { plan?: { name?: string } | null; status?: string; expiresAt?: string | null; startsAt?: string | null } | null; serverNow?: string }) => {
       const sub = d?.subscription
       if (!sub) return
-      setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null, startsAt: sub.startsAt || null })
+      setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null, startsAt: sub.startsAt || null, serverNow: d.serverNow || null })
       if (!sub?.expiresAt || !['ACTIVE', 'PENDING_VERIFICATION'].includes(sub.status)) return
-      const ms = new Date(sub.expiresAt).getTime() - Date.now()
+      // Days-left banner also uses server time, not the device clock.
+      const nowMs = d.serverNow ? new Date(d.serverNow).getTime() : Date.now()
+      const ms = new Date(sub.expiresAt).getTime() - nowMs
       const daysLeft = Math.ceil(ms / 86400000)
       if (daysLeft <= 7) setExpiry({ planName: sub.plan?.name || 'Current plan', expiresAt: sub.expiresAt, daysLeft })
-    }).catch(() => {})
+    }
+    fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then(apply).catch(() => {})
     // Refresh the clock data every minute so renewals reflect without a reload.
     const t = setInterval(() => {
-      fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
-        const sub = d?.subscription
-        if (!sub) return
-        setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null, startsAt: sub.startsAt || null })
-      }).catch(() => {})
+      fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then(apply).catch(() => {})
     }, 60000)
     return () => clearInterval(t)
   }, [])
@@ -119,7 +120,7 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
       </header>
 
       <div className="container mx-auto px-3 sm:px-4 py-4">
-        {planInfo && <PlanClock planName={planInfo.planName} status={planInfo.status} expiresAt={planInfo.expiresAt} startsAt={planInfo.startsAt} />}
+        {planInfo && <PlanClock planName={planInfo.planName} status={planInfo.status} expiresAt={planInfo.expiresAt} startsAt={planInfo.startsAt} serverNow={planInfo.serverNow} />}
         {superNoticeOpen && (
           <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <div className="flex items-start gap-2">
