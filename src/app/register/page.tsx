@@ -123,6 +123,9 @@ export default function RegisterPage() {
               {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Create my shop — start 7-day free trial
             </Button>
           </form>
+          <p className="text-xs text-muted-foreground mt-3 text-center">
+            Account banate hi aap <Link href="/terms" className="underline">Terms of Service</Link> aur <Link href="/privacy" className="underline">Privacy Policy</Link> se sehmat hote hain — ek baar padh lein, simple Hinglish me likhi hai.
+          </p>
           <p className="text-xs text-muted-foreground mt-4 text-center">
             Pehle se account hai? <Link href="/login" className="underline">Shop Owner sign in</Link> · Forgot password? <Link href="/forgot-password" className="underline">Reset it</Link>
           </p>

@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   TriangleAlert,
   BookOpen,
+  ScrollText,
+  Lock,
 } from 'lucide-react'
 
 export const revalidate = 3600
@@ -268,8 +270,18 @@ export default async function Home() {
               </a>
             </Button>
             <Button asChild variant="ghost" size="sm">
+              <Link href="/terms">
+                <ScrollText className="h-4 w-4 mr-1.5" aria-hidden /> Terms
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/privacy">
+                <ShieldCheck className="h-4 w-4 mr-1.5" aria-hidden /> Privacy
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
               <Link href="/super/login">
-                <ShieldCheck className="h-4 w-4 mr-1.5" aria-hidden /> Super Admin
+                <Lock className="h-4 w-4 mr-1.5" aria-hidden /> Super Admin
               </Link>
             </Button>
           </nav>
