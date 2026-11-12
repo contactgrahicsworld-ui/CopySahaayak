@@ -1,13 +1,12 @@
 'use client'
 
-// Super Admin creation — SIMPLE by design (owner request: "page complex mat
-// banao"). ONE form, ONE button:
-//   • Fresh platform            → Email + Password + Confirm. Bas.
+// Super Admin creation — ONE form, ONE button (owner request: full credentials):
+//   Name + Email + Password + Confirm password + WhatsApp number.
+//   • Fresh platform            → the five fields. Bas.
 //   • Recovery/locked platform  → same form + one Recovery key box.
-// No claim tokens in the UI, no two-step flow, no name/phone/UPI fields —
-// name auto-derives from the email and UPI is set later in Settings.
-// Credentials are NEVER provided by the app or a script: the owner types
-// their own email and password here, exactly once.
+// No claim tokens in the UI, no two-step flow, no UPI field — UPI is set later
+// in Settings. Credentials are NEVER provided by the app or a script: the
+// owner types their own details here, exactly once.
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,7 +21,9 @@ export default function SetupPage() {
   const [locked, setLocked] = useState(false)        // a super admin already exists
   const [needsKey, setNeedsKey] = useState(false)    // platform is in recovery state
   const [recoveryMode, setRecoveryMode] = useState(false) // owner opened recovery from the locked screen
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [resetKey, setResetKey] = useState('')
@@ -41,6 +42,10 @@ export default function SetupPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (name.trim().length < 2) {
+      toast.error('Apna naam likho (kam se kam 2 letters)')
+      return
+    }
     if (password !== confirm) {
       toast.error('Password aur confirm password same nahi hai')
       return
@@ -49,13 +54,20 @@ export default function SetupPage() {
       toast.error('Password me kam se kam 8 characters hone chahiye — letters + numbers')
       return
     }
+    const wa = whatsapp.replace(/[\s\-().\u00a0]/g, '')
+    if (!/^\+?[0-9]{8,15}$/.test(wa)) {
+      toast.error('WhatsApp number valid nahi hai (8-15 digits)')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('/api/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name: name.trim(),
           email,
+          phone: wa,
           password,
           ...(resetKey ? { resetKey } : {}),
         }),
@@ -118,8 +130,8 @@ export default function SetupPage() {
           <CardTitle className="text-xl">Super Admin account banao</CardTitle>
           <CardDescription>
             {showKey
-              ? 'Recovery key paste karo aur APNA naya email + password set karo.'
-              : 'Apna email aur password KHUD set karo. App ya script koi password nahi deti.'}
+              ? 'Recovery key paste karo aur APNA naya account banao.'
+              : 'Apni details KHUD bharo — naam, email, WhatsApp aur password. App ya script koi credential nahi deti.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -135,8 +147,17 @@ export default function SetupPage() {
               </div>
             )}
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email (login ID)</Label>
+              <Label htmlFor="name">Name (aapka naam)</Label>
+              <Input id="name" required minLength={2} maxLength={80} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Aapka pura naam" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email ID (login ID)</Label>
               <Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="aapka@email.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="whatsapp">WhatsApp number</Label>
+              <Input id="whatsapp" required inputMode="tel" autoComplete="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="98XXXXXXXX" />
+              <p className="text-[11px] text-muted-foreground">Platform se jude important updates isi number par jaayenge.</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>

@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       await ensurePlatformBootstrap()
       // Hash BEFORE opening the transaction — bcrypt must not hold the DB connection.
       const passwordHash = await bcryptHash(body.password)
-      // Simple page sends no name: derive a friendly one from the email.
+      // Full form sends name + WhatsApp; fallback derive stays as defense-in-depth.
       const derived = email.split('@')[0]?.replace(/[._\-]+/g, ' ').trim() || ''
       const name = (body.name?.trim() || derived || 'Platform Owner').slice(0, 80)
 

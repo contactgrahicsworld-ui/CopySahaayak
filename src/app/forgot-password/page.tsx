@@ -1,8 +1,12 @@
 'use client'
 
 // Forgot password: request a 6-digit email OTP, then set a new password.
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+// Works for every account type — shop owners AND the platform's Super Admin.
+// The email is delivered by Supabase's built-in free-tier mailer; the code is
+// verified server-side before the bcrypt password is updated and every old
+// session is revoked.
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,12 +16,25 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 
 export default function ForgotPasswordPage() {
+  return (
+    <Suspense>
+      <ForgotPasswordForm />
+    </Suspense>
+  )
+}
+
+function ForgotPasswordForm() {
   const router = useRouter()
+  const params = useSearchParams()
+  const fromSuper = params.get('from') === 'super'
   const [stage, setStage] = useState<'EMAIL' | 'CODE'>('EMAIL')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const signInHref = fromSuper ? '/super/login' : '/login'
+  const signInLabel = fromSuper ? 'Super Admin sign in' : 'Back to sign in'
 
   async function requestOtp(e: React.FormEvent) {
     e.preventDefault()
@@ -30,7 +47,7 @@ export default function ForgotPasswordPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Could not send the email')
-      toast.success('6-digit code sent — check your email inbox')
+      toast.success('6-digit code email par bhej diya — inbox check karo')
       setStage('CODE')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not send the email')
@@ -50,8 +67,9 @@ export default function ForgotPasswordPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Could not reset the password')
-      toast.success('Password updated. Please sign in.')
-      router.push('/login')
+      toast.success('Password set ho gaya. Ab sign in karo.')
+      // Super admins go back to their own portal; shop owners to theirs.
+      router.push(fromSuper ? '/super/login?reset=1' : '/login?reset=1')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not reset the password')
     } finally {
@@ -68,44 +86,44 @@ export default function ForgotPasswordPage() {
           ) : (
             <MailCheck className="h-8 w-8 mx-auto mb-2 text-green-600" aria-hidden />
           )}
-          <CardTitle className="text-xl">Forgot password</CardTitle>
+          <CardTitle className="text-xl">Password bhool gaye?</CardTitle>
           <CardDescription>
             {stage === 'EMAIL'
-              ? 'We will email you a 6-digit code.'
-              : `Enter the code sent to ${email} and choose a new password.`}
+              ? 'Aapke email par ek 6-digit code bheja jayega.'
+              : `${email} par bheja gaya code daalo aur naya password set karo.`}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {stage === 'EMAIL' ? (
             <form onSubmit={requestOtp} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="email">Account email</Label>
-                <Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="owner@shop.in" />
+                <Label htmlFor="email">Account ka email</Label>
+                <Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="aapka@email.com" />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Send code
+                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Code bhejo
               </Button>
             </form>
           ) : (
             <form onSubmit={submitReset} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="code">6-digit code from email</Label>
+                <Label htmlFor="code">Email wala 6-digit code</Label>
                 <Input id="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="123456" className="tracking-widest text-center" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="password">New password</Label>
-                <Input id="password" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="8+ chars, letters and digits" />
+                <Label htmlFor="password">Naya password</Label>
+                <Input id="password" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="8+ characters, letters + numbers" />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Set new password
+                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />}Naya password set karo
               </Button>
               <Button type="button" variant="outline" className="w-full" disabled={loading} onClick={() => setStage('EMAIL')}>
-                Use a different email
+                Koi aur email use karo
               </Button>
             </form>
           )}
           <p className="text-xs text-center mt-4">
-            <Link href="/login" className="underline">Back to sign in</Link>
+            <Link href={signInHref} className="underline">{signInLabel}</Link>
           </p>
         </CardContent>
       </Card>

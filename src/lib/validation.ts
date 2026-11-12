@@ -155,14 +155,22 @@ export const superHandoverSchema = z.object({
   password: z.string().min(1).max(200),
 })
 
+// WhatsApp / contact number for the platform owner: lenient international
+// format (optional +, 8-15 digits) with spaces/hyphens/brackets stripped
+// before validation. Stored normalized (no separators).
+export const whatsappNumberSchema = z
+  .string()
+  .transform((v) => v.replace(/[\s\-\u00a0().]/g, ''))
+  .refine((v) => /^\+?[0-9]{8,15}$/.test(v), 'Enter a valid WhatsApp number (8-15 digits)')
+
 export const setupSchema = z.object({
-  // Simple creation page: the owner fills ONLY email + password (+ recovery
-  // key when the platform is locked). Name auto-derives from the email,
-  // phone/UPI are set later from Super Admin → Settings.
-  name: z.string().trim().min(2).max(80).optional(),
+  // FULL creation form (owner request): name, email, password, confirm
+  // password and WhatsApp number — the owner fills every field themselves on
+  // /setup. UPI stays optional (also editable later in Settings).
+  name: z.string().trim().min(2, 'Enter your name (kam se kam 2 letters)').max(80),
   email: z.string().trim().email().max(120),
   password: newPasswordSchema,
-  phone: z.string().trim().max(20).optional(),
+  phone: whatsappNumberSchema,
   // Platform UPI ID where all shop-owner plan/subscription payments are collected.
   upiVpa: z
     .string()

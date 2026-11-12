@@ -24,6 +24,7 @@ export default function SuperLoginPage() {
 function SuperLoginForm() {
   const params = useSearchParams()
   const created = params.get('created') === '1'
+  const resetDone = params.get('reset') === '1'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -95,6 +96,12 @@ function SuperLoginForm() {
               <span>Platform owner account ban gaya! Ab usi email/password se sign in karein.</span>
             </div>
           )}
+          {resetDone && (
+            <div role="status" className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-900 flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+              <span>Password reset ho gaya! Naye password se sign in karein.</span>
+            </div>
+          )}
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
@@ -112,7 +119,7 @@ function SuperLoginForm() {
             Dukaan owner hain? Ye login aapke liye nahi hai — home page par <b>&ldquo;Shop Owner&rdquo;</b> button use karein.
           </p>
           <p className="text-xs text-center mt-2">
-            <Link href="/forgot-password" className="underline">Forgot password?</Link>
+            <Link href="/forgot-password?from=super" className="underline">Forgot password?</Link>
             {' · '}
             <Link href="/" className="underline">Back to home</Link>
           </p>
