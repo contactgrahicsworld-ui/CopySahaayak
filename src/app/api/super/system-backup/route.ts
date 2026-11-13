@@ -79,7 +79,7 @@ export async function DELETE(req: Request) {
     const url = new URL(req.url)
     const jobId = url.searchParams.get('jobId') || ''
     const job = await retryDb(() => db.backupJob.findUnique({ where: { id: jobId } }))
-    if (!job || job.scope !== 'SYSTEM') throw new HttpError(404, 'Backup job not found')
+    if (!job || job.kind !== 'BACKUP' || job.scope !== 'SYSTEM') throw new HttpError(404, 'Backup job not found')
     await retryDb(() => db.backupJob.delete({ where: { id: jobId } }))
     return jsonOk({ deleted: true })
   })

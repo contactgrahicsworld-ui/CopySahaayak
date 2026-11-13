@@ -39,9 +39,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Next 16 removed the built-in ESLint build step, so no `eslint` key here.
   reactStrictMode: false,
   // The app is reached through sandbox preview tunnels whose public host differs
   // from the internal Host; allow dev asset/HMR requests from those origins.

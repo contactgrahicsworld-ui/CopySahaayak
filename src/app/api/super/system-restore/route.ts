@@ -12,7 +12,7 @@ import { getAuthedUser, HttpError } from '@/lib/auth'
 import { db, retryDb } from '@/lib/db'
 import { audit } from '@/lib/audit'
 import { getClientIp, bcryptCompare } from '@/lib/security'
-import { validateDump, restoreSystemDump, isGzip, MAX_BACKUP_BYTES } from '@/lib/backup-dump'
+import { validateDump, restoreSystemDump, isGzip, MAX_BACKUP_BYTES, MAX_DECOMPRESSED_BYTES, gzipDecompressedSize } from '@/lib/backup-dump'
 import zlib from 'zlib'
 
 export const dynamic = 'force-dynamic'
@@ -60,12 +60,15 @@ export async function POST(req: Request) {
       if (!me || !(await bcryptCompare(body.password, me.passwordHash))) throw new HttpError(403, 'Password galat hai')
       const job = await retryDb(() => db.backupJob.findUnique({ where: { id: jobId }, include: { chunks: { orderBy: { idx: 'asc' } } } }))
       if (!job || job.kind !== 'RESTORE' || job.scope !== 'SYSTEM') throw new HttpError(404, 'Restore job not found')
+      if (job.state !== 'UPLOADING') throw new HttpError(409, 'Ye restore pehle hi process ho chuka hai — dobara shuru na karein')
       if (job.chunks.length !== job.parts || job.chunks[job.chunks.length - 1]?.idx !== job.parts - 1) {
         throw new HttpError(400, `Sirf ${job.chunks.length}/${job.parts} parts mile — poora file bhejein`)
       }
       const b64 = job.chunks.map((c) => c.payload).join('')
       const raw = Buffer.from(b64, 'base64')
       if (raw.length > MAX_BACKUP_BYTES) throw new HttpError(413, 'Backup file platform ki size limit se badi hai')
+      const decomp = gzipDecompressedSize(raw)
+      if (decomp > MAX_DECOMPRESSED_BYTES) throw new HttpError(413, 'Backup file restore limit se badi hai — chhote hisson me purana data lein')
       let dump: unknown
       try {
         const text = isGzip(raw) ? zlib.gunzipSync(raw).toString('utf8') : raw.toString('utf8')
@@ -74,9 +77,14 @@ export async function POST(req: Request) {
         throw new HttpError(400, 'Backup file corrupt hai (parse fail) — dobara download karein')
       }
       validateDump(dump, 'SYSTEM')
+      // Claim the job BEFORE the destructive step (after all read-only checks
+      // passed): a double-click / concurrent second commit can never run the
+      // wipe twice (idempotency guard).
+      await retryDb(() => db.backupJob.update({ where: { id: jobId }, data: { state: 'COMMITTING' } }))
       const counts = await restoreSystemDump(dump)
-      await retryDb(() => db.backupJob.update({ where: { id: jobId }, data: { state: 'COMMITTED' } }))
-      await retryDb(() => db.backupJob.delete({ where: { id: jobId } }))
+      // NOTE: restoreSystemDump wipes BackupJob rows inside its transaction
+      // (system wipe list), so this job no longer exists here — no update/delete
+      // (a P2025 here would falsely report failure after a successful restore).
       await audit({
         actorType: 'USER',
         actorId: ctx.user.id,

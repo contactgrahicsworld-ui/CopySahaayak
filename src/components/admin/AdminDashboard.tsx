@@ -71,7 +71,7 @@ export function AdminDashboard({ user, shop, notice }: { user: UserProp; shop: S
       const sub = d?.subscription
       if (!sub) return
       setPlanInfo({ planName: sub.plan?.name || 'Plan', status: sub.status || 'ACTIVE', expiresAt: sub.expiresAt || null, startsAt: sub.startsAt || null, serverNow: d.serverNow || null })
-      if (!sub?.expiresAt || !['ACTIVE', 'PENDING_VERIFICATION'].includes(sub.status)) return
+      if (!sub?.expiresAt || !(sub.status === 'ACTIVE' || sub.status === 'PENDING_VERIFICATION')) return
       // Days-left banner also uses server time, not the device clock.
       const nowMs = d.serverNow ? new Date(d.serverNow).getTime() : Date.now()
       const ms = new Date(sub.expiresAt).getTime() - nowMs

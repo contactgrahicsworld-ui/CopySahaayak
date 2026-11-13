@@ -292,4 +292,13 @@ export function isGzip(buf: Buffer): boolean {
   return buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b
 }
 
+// Serverless memory guard: read the gzip ISIZE trailer (last 4 bytes, little
+// endian = decompressed size mod 2^32) BEFORE gunzipSync allocates the output.
+// Prevents a hostile or oversized backup file from OOM-killing the function.
+export const MAX_DECOMPRESSED_BYTES = 900 * 1024 * 1024 // 900MB decoded ceiling
+export function gzipDecompressedSize(buf: Buffer): number {
+  if (!isGzip(buf) || buf.length < 18) return buf.length // plain JSON
+  return buf.readUInt32LE(buf.length - 4)
+}
+
 export { timingSafeEqualStr }
