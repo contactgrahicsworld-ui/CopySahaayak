@@ -93,3 +93,4 @@ prisma/*.pg-backup
 .deploy-log.txt
 .token-response
 .no-deploy-*
+.device-code-pending
