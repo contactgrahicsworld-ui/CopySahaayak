@@ -14,11 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
 import { AuthorityTransferCard } from '@/components/AuthorityTransferCard'
+import { BackupRestoreCard } from '@/components/admin/BackupRestoreCard'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, Store, BadgeCheck, Layers, ScrollText, Settings, LogOut, Loader2,
-  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2, AtSign, Undo2, Download,
+  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2, AtSign, Undo2,
 } from 'lucide-react'
 
 export function SuperDashboard({ user }: { user: { name: string; email: string } }) {
@@ -76,7 +77,7 @@ export function SuperDashboard({ user }: { user: { name: string; email: string }
           <TabsContent value="subs"><SubsTab /></TabsContent>
           <TabsContent value="plans"><PlansTab /></TabsContent>
           <TabsContent value="audit"><AuditTab /></TabsContent>
-          <TabsContent value="settings"><div className="space-y-4"><PlatformSettingsTab /><AuthorityTransferCard scope="PLATFORM" apiBase="/api/super/transfer" /><PlatformOwnershipCard /></div></TabsContent>
+          <TabsContent value="settings"><div className="space-y-4"><BackupRestoreCard scope="SYSTEM" title="System Backup & Restore — poora platform (date ke saath system file)" /><PlatformSettingsTab /><AuthorityTransferCard scope="PLATFORM" apiBase="/api/super/transfer" /><PlatformOwnershipCard /></div></TabsContent>
         </Tabs>
       </div>
 
@@ -95,15 +96,15 @@ function CenterSpinner() {
 }
 
 function OverviewTab() {
+  // Tenant isolation: NO shop business data here — platform-own metrics only.
   const [stats, setStats] = useState<{
     shops: { total: number; active: number; suspended: number }
-    orders: { total: number; thisMonth: number }
     revenue: { subscriptionAllPaise: number; subscriptionMonthPaise: number }
-    pending: { subscriptionPayments: number; shopPayments: number }
+    pending: { subscriptionPayments: number }
     subscriptions: { active: number }
     devices: { registered: number; onlineNow: number }
     storage: { totalBytes: number; documents: number }
-    gmvDaily: Array<{ date: string; paise: number }>
+    subRevenueDaily: Array<{ date: string; paise: number }>
   } | null>(null)
   const [platformUpi, setPlatformUpi] = useState<string | null>(null)
 
@@ -122,7 +123,7 @@ function OverviewTab() {
   }, [])
 
   if (!stats) return <CenterSpinner />
-  const max = Math.max(1, ...stats.gmvDaily.map((d) => d.paise))
+  const max = Math.max(1, ...stats.subRevenueDaily.map((d) => d.paise))
   return (
     <div className="space-y-4">
       {platformUpi === '' && (
@@ -136,19 +137,18 @@ function OverviewTab() {
         <MiniStat label="Active subscriptions" value={String(stats.subscriptions.active)} />
         <MiniStat label="Subscription revenue (month)" value={formatInr(stats.revenue.subscriptionMonthPaise)} />
         <MiniStat label="Subscription revenue (all)" value={formatInr(stats.revenue.subscriptionAllPaise)} />
-        <MiniStat label="Orders (month/total)" value={`${stats.orders.thisMonth}/${stats.orders.total}`} />
         <MiniStat label="Devices online now" value={String(stats.devices.onlineNow)} />
-        <MiniStat label="Pending verifications" value={String(stats.pending.subscriptionPayments + stats.pending.shopPayments)} highlight={stats.pending.subscriptionPayments > 0} />
+        <MiniStat label="Pending verifications" value={String(stats.pending.subscriptionPayments)} highlight={stats.pending.subscriptionPayments > 0} />
         <MiniStat label="Storage used" value={`${(stats.storage.totalBytes / 1024 / 1024).toFixed(1)} MB · ${stats.storage.documents} docs`} />
       </div>
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">Verified shop payments (last 14 days)</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Subscription revenue (last 14 days)</CardTitle></CardHeader>
         <CardContent>
-          {stats.gmvDaily.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No verified order payments yet.</p>
+          {stats.subRevenueDaily.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No verified subscription payments yet.</p>
           ) : (
             <div className="space-y-1.5">
-              {stats.gmvDaily.map((d) => (
+              {stats.subRevenueDaily.map((d) => (
                 <div key={d.date} className="flex items-center gap-2 text-xs">
                   <span className="w-20 shrink-0 text-muted-foreground">{d.date.slice(5)}</span>
                   <div className="h-4 rounded bg-primary/70" style={{ width: `${(d.paise / max) * 70}%` }} />
@@ -183,7 +183,8 @@ interface ShopRow {
   createdAt: string
   subscription: { status: string; expiresAt: string | null; plan: { name: string; code: string } } | null
   users: Array<{ email: string; name: string }>
-  _count: { orders: number; devices: number; printers: number }
+  // Tenant isolation: order counts intentionally absent — business data.
+  _count: { devices: number; printers: number }
 }
 
 function ShopsTab() {
@@ -199,8 +200,6 @@ function ShopsTab() {
   const [delConfirm, setDelConfirm] = useState('')
   const [planFree, setPlanFree] = useState<ShopRow | null>(null)
   const [planBusy, setPlanBusy] = useState(false)
-  const [backupRange, setBackupRange] = useState('month')
-  const backupLabel = backupRange === 'week' ? 'यह हफ़्ता (7 दिन)' : backupRange === 'month' ? 'यह महीना (30 दिन)' : 'पूरा डेटा'
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/super/shops?q=${encodeURIComponent(q)}`, { cache: 'no-store' })
@@ -299,22 +298,10 @@ function ShopsTab() {
         <Input placeholder="Search shops" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:max-w-xs" />
         <Button variant="outline" size="sm" onClick={load} aria-label="Refresh"><RefreshCw className="h-4 w-4" aria-hidden /></Button>
         <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" aria-hidden /> Onboard shop</Button>
-        <div className="flex flex-wrap gap-2 items-center sm:ml-auto">
-          <Select value={backupRange} onValueChange={setBackupRange}>
-            <SelectTrigger className="w-44" aria-label="बैकअप अवधि"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">यह हफ़्ता (7 दिन)</SelectItem>
-              <SelectItem value="month">यह महीना (30 दिन)</SelectItem>
-              <SelectItem value="all">पूरा डेटा</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button size="sm" asChild variant="outline">
-            <a href={`/api/admin/backup?range=${backupRange}&platform=1`} download aria-label="सभी shops का platform backup डाउनलोड करें">
-              <Download className="h-4 w-4 mr-1.5" aria-hidden /> Platform backup ({backupLabel})
-            </a>
-          </Button>
-        </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Tenant isolation: shop owners ka business data (orders, customers, files) sirf unke apne dashboard me hota hai — platform admin ke paas na Excel export hota hai na order data dikhta hai.
+      </p>
 
       {loading ? (
         <CenterSpinner />
@@ -330,7 +317,7 @@ function ShopsTab() {
                   <p className="text-xs text-muted-foreground">
                     {s.users[0]?.email || 'no admin'} · {s.subscription?.plan?.name || 'no plan'} ({s.subscription?.status || '—'})
                     {s.subscription?.expiresAt ? ` until ${new Date(s.subscription.expiresAt).toLocaleDateString('en-IN')}` : ''}
-                    {` · ${s._count.orders} orders · ${s._count.devices} devices`}
+                    {` · ${s._count.devices} devices`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -341,9 +328,6 @@ function ShopsTab() {
                     <Button size="sm" onClick={() => act(s.id, 'ACTIVATE')}><ShieldCheck className="h-3.5 w-3.5 mr-1" aria-hidden />Activate</Button>
                   )}
                   <Button size="sm" variant="outline" onClick={() => act(s.id, 'RESET_PASSWORD')}><KeyRound className="h-3.5 w-3.5 mr-1" aria-hidden />Reset pwd</Button>
-                  <Button size="sm" variant="outline" asChild aria-label={`${s.name} का backup डाउनलोड करें`}>
-                    <a href={`/api/admin/backup?range=${backupRange}&shopId=${s.id}`} download><Download className="h-3.5 w-3.5 mr-1" aria-hidden />Backup</a>
-                  </Button>
                   {s.subscription?.plan?.code && !['FREE', 'TRIAL'].includes(s.subscription.plan.code) && (
                     <Button size="sm" variant="outline" aria-label={`Move ${s.slug} to the Trial plan`} onClick={() => setPlanFree(s)}><Undo2 className="h-3.5 w-3.5 mr-1" aria-hidden />Plan → Trial</Button>
                   )}

@@ -1,4 +1,7 @@
-// Super admin platform analytics.
+// Super admin PLATFORM analytics — tenant-isolated.
+// Owner requirement: the platform admin must NOT see shops' business data
+// (orders, customer payments/GMV). Everything here is platform-own data:
+// shop accounts (counts/plan/status), subscription revenue, devices, storage.
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk } from '@/lib/api'
 import { requireSuper } from '@/lib/auth'
@@ -12,13 +15,11 @@ export async function GET(req: Request) {
     monthStart.setDate(1)
     monthStart.setHours(0, 0, 0, 0)
 
-    const [shops, activeShops, suspended, orders, ordersMonth, revenueAll, revenueMonth, pendingSubPayments, activeSubs, devices, onlineDevices, storageAgg, pendingShopPayments] =
+    const [shops, activeShops, suspended, revenueAll, revenueMonth, pendingSubPayments, activeSubs, devices, onlineDevices, storageAgg] =
       await Promise.all([
         db.shop.count(),
         db.shop.count({ where: { isActive: true } }),
         db.shop.count({ where: { isActive: false } }),
-        db.order.count(),
-        db.order.count({ where: { createdAt: { gte: monthStart } } }),
         db.subscriptionPayment.aggregate({ where: { status: 'VERIFIED' }, _sum: { amountPaise: true } }),
         db.subscriptionPayment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: monthStart } }, _sum: { amountPaise: true } }),
         db.subscriptionPayment.count({ where: { status: 'PENDING' } }),
@@ -26,7 +27,6 @@ export async function GET(req: Request) {
         db.device.count({ where: { status: { in: ['PENDING', 'ACTIVE'] } } }),
         db.device.count({ where: { status: 'ACTIVE', lastSeenAt: { gte: new Date(Date.now() - 5 * 60 * 1000) } } }),
         db.document.aggregate({ where: { status: 'READY' }, _sum: { sizeBytes: true }, _count: true }),
-        db.payment.count({ where: { status: 'SUBMITTED' } }),
       ])
 
     // Plan distribution
@@ -37,32 +37,31 @@ export async function GET(req: Request) {
       count: p._count,
     }))
 
-    // Last 14 days of platform GMV (verified shop payments)
-    const recent = await db.payment.findMany({
+    // Subscription revenue trend (platform's OWN income — never shops' GMV)
+    const recentSubs = await db.subscriptionPayment.findMany({
       where: { status: 'VERIFIED', verifiedAt: { gte: new Date(Date.now() - 14 * 86400000) } },
-      select: { verifiedAt: true, createdAt: true, amountPaise: true },
+      select: { verifiedAt: true, amountPaise: true },
     })
     const byDay = new Map<string, number>()
-    for (const p of recent) {
-      const key = (p.verifiedAt || p.createdAt).toISOString().slice(0, 10)
+    for (const p of recentSubs) {
+      const key = (p.verifiedAt || new Date()).toISOString().slice(0, 10)
       byDay.set(key, (byDay.get(key) || 0) + p.amountPaise)
     }
-    const gmvDaily = Array.from(byDay.entries())
+    const subRevenueDaily = Array.from(byDay.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, paise]) => ({ date, paise }))
 
     return jsonOk({
       shops: { total: shops, active: activeShops, suspended },
-      orders: { total: orders, thisMonth: ordersMonth },
       revenue: {
         subscriptionAllPaise: revenueAll._sum.amountPaise || 0,
         subscriptionMonthPaise: revenueMonth._sum.amountPaise || 0,
       },
-      pending: { subscriptionPayments: pendingSubPayments, shopPayments: pendingShopPayments },
+      pending: { subscriptionPayments: pendingSubPayments },
       subscriptions: { active: activeSubs, planDistribution: planDistOut },
       devices: { registered: devices, onlineNow: onlineDevices },
       storage: { totalBytes: storageAgg._sum.sizeBytes || 0, documents: storageAgg._count },
-      gmvDaily,
+      subRevenueDaily,
     })
   })
 }

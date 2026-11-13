@@ -17,6 +17,7 @@ import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
 import { AuthorityTransferCard } from '@/components/AuthorityTransferCard'
 import { PlanClock } from '@/components/admin/PlanClock'
+import { BackupRestoreCard } from '@/components/admin/BackupRestoreCard'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
@@ -1228,6 +1229,7 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
 
   return (
     <div className="space-y-4">
+      <BackupRestoreCard scope="SHOP" title="Business Backup & Restore — apna poora data (Excel + system file)" />
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2"><QrCode className="h-4 w-4" aria-hidden /> Your shop QR code</CardTitle>

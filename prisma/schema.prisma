@@ -606,3 +606,38 @@ model RateLimitEntry {
 
   @@schema("csp")
 }
+
+// ============ BACKUP / RESTORE TRANSFER (chunked) ============
+// Vercel serverless responses and request bodies are capped (~4.5MB), so a
+// real full backup (orders + files as base64) is transferred in ~1.5MB text
+// chunks. BACKUP jobs are built server-side and fetched part-by-part; RESTORE
+// jobs are uploaded part-by-part then committed. Rows expire after 2h and are
+// purged by the retention cron — nothing lingers in the DB.
+model BackupJob {
+  id        String        @id @default(cuid())
+  kind      String        // BACKUP (server-built) | RESTORE (client upload)
+  scope     String        // SYSTEM | SHOP
+  shopId    String?       // SHOP scope only
+  createdBy String        // userId of the admin who created it
+  state     String        @default("READY") // READY | UPLOADING | COMMITTED | FAILED
+  parts     Int           @default(0)
+  filename  String?
+  sizeBytes Int           @default(0)
+  createdAt DateTime      @default(now())
+  expiresAt DateTime
+  chunks    BackupChunk[]
+
+  @@index([expiresAt])
+  @@schema("csp")
+}
+
+model BackupChunk {
+  id      String    @id @default(cuid())
+  jobId   String
+  job     BackupJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  idx     Int
+  payload String
+
+  @@unique([jobId, idx])
+  @@schema("csp")
+}

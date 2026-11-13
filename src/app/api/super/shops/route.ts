@@ -21,7 +21,9 @@ export async function GET(req: Request) {
       include: {
         subscription: { include: { plan: true } },
         users: { where: { role: 'SHOP_ADMIN' }, select: { email: true, name: true } },
-        _count: { select: { orders: true, devices: true, printers: true } },
+        // Tenant isolation: order counts are the shop's business data — never
+        // exposed to the platform admin. Devices/printers are operational.
+        _count: { select: { devices: true, printers: true } },
       },
     })
     return jsonOk({ shops })

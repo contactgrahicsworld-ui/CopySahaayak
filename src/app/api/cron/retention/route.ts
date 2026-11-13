@@ -49,6 +49,9 @@ export async function GET(req: Request) {
     db.authorityTransfer
       .deleteMany({ where: { status: { not: 'PENDING' }, updatedAt: { lt: d7 } } })
       .catch(() => null),
+    // Chunked backup/restore transfers are 2h-lifetime by design — sweep the
+    // stragglers so multi-MB chunk payloads never linger in the DB.
+    db.backupJob.deleteMany({ where: { expiresAt: { lt: now } } }).catch(() => null),
   ])
 
   const count = (r: { count: number } | null) => (r ? r.count : -1)
