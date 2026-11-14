@@ -75,20 +75,16 @@ async function main() {
   await db.shop.update({ where: { id: shop.id }, data: { youpiEnabled: true, youpiMerchantId: 'mrc_e2e', youpiApiKey: 'ak_e2e', youpiWebhookSecret: secret, youpiPublicKey: 'pk_e2e' } })
   // Platform gateway settings must exist BEFORE order tests: the shop-scope
   // config inherits the shared gateway base URL from the platform settings.
-  await db.platformSetting.createMany({
-    data: [
-      { key: 'youpi_api_url', value: 'https://gw-e2e.invalid' },
-      { key: 'youpi_merchant_id', value: 'mrc_platform_e2e' },
-      { key: 'youpi_merchant_api_key', value: 'ak_platform_e2e' },
-      { key: 'youpi_webhook_secret', value: platformSecret },
-    ],
-  })
+  // Upsert (not createMany): a crashed earlier run may have left rows behind.
   createdSettings.push(
     ['youpi_api_url', 'https://gw-e2e.invalid'],
     ['youpi_merchant_id', 'mrc_platform_e2e'],
     ['youpi_merchant_api_key', 'ak_platform_e2e'],
     ['youpi_webhook_secret', platformSecret]
   )
+  for (const [key, value] of createdSettings) {
+    await db.platformSetting.upsert({ where: { key }, update: { value }, create: { key, value } })
+  }
   console.log(`fixtures: shop=${shop.slug} order=${order.orderNumber} payment=${payment.id}`)
 
   // ---------- ORDER FLOW ----------
@@ -154,32 +150,33 @@ async function main() {
 
 async function cleanup() {
   console.log('\ncleanup…')
+  const step = async (name, fn) => { try { await fn() } catch (e) { console.log(`  warn: ${name}: ${String(e.message || e).slice(0, 120)}`) } }
   const shops = await db.shop.findMany({ where: { slug: { startsWith: 'gw-e2e-' } }, select: { id: true } })
   for (const s of shops) {
     // Explicit child deletes (cascade order is not guaranteed across FKs).
     const paymentIds = (await db.payment.findMany({ where: { shopId: s.id } })).map((p) => p.id)
     const subPayIds = (await db.subscriptionPayment.findMany({ where: { shopId: s.id }, select: { id: true } })).map((r) => r.id)
     const events = await db.gatewayEvent.deleteMany({ where: { OR: [{ targetId: { in: paymentIds } }, { targetId: { in: subPayIds } }] } })
-    await db.subscriptionPayment.deleteMany({ where: { shopId: s.id } })
-    await db.subscription.deleteMany({ where: { shopId: s.id } })
-    await db.printEvent.deleteMany({ where: { shopId: s.id } })
-    await db.printJob.deleteMany({ where: { shopId: s.id } })
-    await db.routingRule.deleteMany({ where: { shopId: s.id } })
-    await db.printer.deleteMany({ where: { shopId: s.id } })
-    await db.device.deleteMany({ where: { shopId: s.id } })
-    await db.orderItem.deleteMany({ where: { shopId: s.id } })
-    await db.paymentVerification.deleteMany({ where: { paymentId: { in: paymentIds } } })
-    await db.payment.deleteMany({ where: { shopId: s.id } })
-    await db.order.deleteMany({ where: { shopId: s.id } })
+    await step('subPayment', () => db.subscriptionPayment.deleteMany({ where: { shopId: s.id } }))
+    await step('subscription', () => db.subscription.deleteMany({ where: { shopId: s.id } }))
+    await step('printEvents', () => db.printEvent.deleteMany({ where: { shopId: s.id } }))
+    await step('printJobs', () => db.printJob.deleteMany({ where: { shopId: s.id } }))
+    await step('routingRules', () => db.routingRule.deleteMany({ where: { shopId: s.id } }))
+    await step('printers', () => db.printer.deleteMany({ where: { shopId: s.id } }))
+    await step('devices', () => db.device.deleteMany({ where: { shopId: s.id } }))
+    await step('orderItems', () => db.orderItem.deleteMany({ where: { shopId: s.id } }))
+    await step('paymentVerifications', () => db.paymentVerification.deleteMany({ where: { paymentId: { in: paymentIds } } }))
+    await step('payments', () => db.payment.deleteMany({ where: { shopId: s.id } }))
+    await step('orders', () => db.order.deleteMany({ where: { shopId: s.id } }))
     const docs = await db.document.findMany({ where: { shopId: s.id }, select: { storedPath: true } })
-    await db.document.deleteMany({ where: { shopId: s.id } })
-    await db.storedObject.deleteMany({ where: { key: { in: docs.map((d) => d.storedPath) } } })
-    await db.customerSession.deleteMany({ where: { shopId: s.id } })
-    await db.pricingRule.deleteMany({ where: { shopId: s.id } })
-    await db.notification.deleteMany({ where: { shopId: s.id } })
-    await db.weeklyReport.deleteMany({ where: { shopId: s.id } })
-    await db.auditLog.deleteMany({ where: { shopId: s.id } })
-    await db.shop.delete({ where: { id: s.id } })
+    await step('documents', () => db.document.deleteMany({ where: { shopId: s.id } }))
+    await step('storedObjects', () => db.storedObject.deleteMany({ where: { key: { in: docs.map((d) => d.storedPath) } } }))
+    await step('customerSessions', () => db.customerSession.deleteMany({ where: { shopId: s.id } }))
+    await step('pricingRules', () => db.pricingRule.deleteMany({ where: { shopId: s.id } }))
+    await step('notifications', () => db.notification.deleteMany({ where: { shopId: s.id } }))
+    await step('weeklyReports', () => db.weeklyReport.deleteMany({ where: { shopId: s.id } }))
+    await step('auditLogs', () => db.auditLog.deleteMany({ where: { shopId: s.id } }))
+    await step('shop', () => db.shop.delete({ where: { id: s.id } }))
     console.log(`  shop ${s.id} deleted (gatewayEvents: ${events.count})`)
   }
   await db.user.deleteMany({ where: { email: { endsWith: '@e2e.test' } } })
