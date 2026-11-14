@@ -48,10 +48,6 @@ export async function POST(req: Request) {
     return reply(400, { error: 'deliveryId missing/invalid' })
   }
 
-  // Dedupe FIRST (cheap): a replayed delivery is answered OK without reprocessing.
-  const existing = await retryDb(() => db.gatewayEvent.findUnique({ where: { deliveryId } }))
-  if (existing) return reply(200, { ok: true, deduped: true, accepted: existing.accepted })
-
   // Route by reference prefix, then verify with the matching scope's secret.
   const orderId = String(payload.orderId || '')
   const isOrder = orderId.startsWith('ORD-')
@@ -77,9 +73,18 @@ export async function POST(req: Request) {
 
   const sig = verifyWebhookSignature(rawBody, cfg.webhookSecret, headers)
   if (!sig.ok) {
+    // Rejected deliveries are recorded but must NEVER poison the dedupe key:
+    // a forged attempt cannot block the gateway's real retry of the same
+    // deliveryId. (Unique-conflicts on repeat rejects are swallowed.)
     await recordEvent(deliveryId, payload, headers.event, isOrder, targetId, false, `signature: ${sig.reason}`, rawBody)
     return reply(401, { error: 'Invalid webhook signature' })
   }
+
+  // Dedupe AFTER signature verification, and only on ACCEPTED deliveries:
+  // the gateway retries byte-identical payloads, so a processed deliveryId is
+  // answered without re-advancing the payment.
+  const existing = await retryDb(() => db.gatewayEvent.findUnique({ where: { deliveryId } }))
+  if (existing?.accepted) return reply(200, { ok: true, deduped: true, accepted: true })
 
   // Event acceptance filter (owner-controlled trust level).
   const verdict = isAcceptableGatewayEvent(payload, cfg.acceptObserved)
@@ -98,10 +103,12 @@ export async function POST(req: Request) {
   }
 
   // Persist the delivery BEFORE advancing (crash-safe audit + dedupe anchor).
+  // Upsert: if a rejected event was recorded earlier under the same deliveryId
+  // (e.g. amount mismatch fixed by the operator), this delivery now wins.
   await retryDb(() =>
     db.gatewayEvent.upsert({
       where: { deliveryId },
-      update: {},
+      update: { accepted: true, reason: null },
       create: { deliveryId, event: String(payload.event || headers.event || ''), scope: isOrder ? 'ORDER' : 'SUBSCRIPTION', targetId, gatewayRef: payload.paymentId || null, amountPaise: observedPaise, utr: payload.utr || null, accepted: true, payloadJson: rawBody.slice(0, 20_000) },
     })
   )
