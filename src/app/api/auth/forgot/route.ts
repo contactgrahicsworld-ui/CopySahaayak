@@ -1,7 +1,10 @@
 // Forgot password step 1: email a 6-digit one-time code.
-// Transport priority: Supabase built-in mailer → Resend (RESEND_API_KEY) → mock
-// (MAIL_MOCK=1, tests only). No user enumeration: unknown emails get the same
-// response shape and timing as known ones.
+// Transport priority: SMTP (SMTP_HOST/PORT/USER/PASS — app-issued OTP, reliable,
+// recommended) → Supabase built-in mailer (free-tier, ~2 mails/hour, best-effort)
+// → Resend (RESEND_API_KEY) → mock (MAIL_MOCK=1, tests only). No user
+// enumeration: unknown emails get the same response shape and timing as known
+// ones. SMTP/Resend/mock verify via the hashed app-OTP table; Supabase codes
+// verify via the Supabase API with app-OTP fallback.
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { forgotPasswordSchema } from '@/lib/validation'
@@ -38,13 +41,13 @@ export async function POST(req: Request) {
           const waitMin = Math.max(1, Math.ceil((result.retryAfterSec || 300) / 60))
           return jsonError(429, `Reset email limit reached (free-tier mailer). Try again in about ${waitMin} minute${waitMin > 1 ? 's' : ''} — or use the Operator recovery (reset key) below, no email needed.`)
         }
-      } else if (mailTransport === 'resend' || mailTransport === 'mock') {
+      } else if (mailTransport === 'smtp' || mailTransport === 'resend' || mailTransport === 'mock') {
         const code = generateOtp()
         const tpl = otpEmailTemplate(code)
         try {
           await sendMail({ to: email, ...tpl })
         } catch {
-          return jsonError(502, 'Password reset is temporarily unavailable. Please try again in a few minutes.')
+          return jsonError(502, 'Password reset email could not be sent. Please try again in a few minutes.')
         }
         // Invalidate previous codes, then store the new one (hashed, 10-minute TTL).
         await db.passwordResetOtp.updateMany({

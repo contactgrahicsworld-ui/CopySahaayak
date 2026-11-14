@@ -1,6 +1,7 @@
 // Forgot password step 2: verify the emailed 6-digit code, then update the app
 // password (bcrypt) and revoke every existing session. Verification path matches
-// the transport used at step 1 (Supabase verify API or our hashed OTP table).
+// the transport used at step 1 (Supabase verify API, or the hashed app-OTP table
+// for SMTP/Resend/mock — including the operator reset-key recovery code).
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { resetPasswordSchema } from '@/lib/validation'
@@ -61,12 +62,12 @@ export async function POST(req: Request) {
           codeOk = await verifyAppOtp(email, body.code).catch(() => false)
           if (codeOk) serviceDown = false
         }
-      } else if (mailTransport === 'resend' || mailTransport === 'mock') {
+      } else if (mailTransport === 'smtp' || mailTransport === 'resend' || mailTransport === 'mock') {
         codeOk = await verifyAppOtp(email, body.code)
       } else {
         return jsonError(
           503,
-          'Password reset email is not configured on this deployment yet. Ask the platform admin to set RESEND_API_KEY (or Supabase keys), or use the Super Admin password reset in the dashboard.'
+          'Password reset email is not configured on this deployment yet. Set SMTP_HOST/SMTP_USER/SMTP_PASS (recommended) or RESEND_API_KEY — or use the Operator recovery (reset key) on the forgot-password page.'
         )
       }
       if (serviceDown) return jsonError(502, 'Password reset is temporarily unavailable. Please try again in a few minutes.')
