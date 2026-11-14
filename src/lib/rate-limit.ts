@@ -24,7 +24,7 @@ export interface RateLimitResult {
 const SHARED_BUCKETS = new Set([
   'login', 'register', 'submitUtr', 'upload', 'createOrder',
   'authEmail', 'authReset', 'pairing', 'change-password',
-  'transfer', 'transfer-accept', 'setup-reset',
+  'transfer', 'transfer-accept', 'setup-reset', 'operator-otp',
 ])
 
 /** Atomic shared fixed-window increment. Null → DB layer unavailable, use memory. */
@@ -101,6 +101,7 @@ export const RATE_LIMITS = {
   transfer: { max: 20, windowMs: 60 * 60 * 1000 },
   transferAccept: { max: 10, windowMs: 60 * 60 * 1000 },
   setupReset: { max: 5, windowMs: 15 * 60 * 1000 },
+  operatorOtp: { max: 5, windowMs: 15 * 60 * 1000 },
 }
 
 // Test isolation hook (dev/test only) — clears all buckets.

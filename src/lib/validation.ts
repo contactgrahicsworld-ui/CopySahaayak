@@ -230,6 +230,13 @@ export const forgotPasswordSchema = z.object({
   email: z.string().trim().email().max(120),
 })
 
+// Operator (break-glass) recovery: the SUPER_SETUP_RESET_KEY holder claims a
+// reset OTP in-channel when the free-tier email delivery fails. Same trust
+// level as the setup recovery key itself.
+export const operatorForgotSchema = forgotPasswordSchema.extend({
+  resetKey: z.string().trim().min(8).max(200),
+})
+
 export const resetPasswordSchema = z.object({
   email: z.string().trim().email().max(120),
   code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code from your email'),

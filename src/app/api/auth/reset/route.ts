@@ -53,10 +53,13 @@ export async function POST(req: Request) {
         } catch {
           serviceDown = true
         }
-        // Fallback: WhatsApp-delivered app-issued codes (verifyAppOtp) when the
-        // email code did not match — keeps both channels valid without weakening either.
-        if (!codeOk && !serviceDown) {
+        // Fallback: app-issued codes (WhatsApp-delivered or the operator
+        // reset-key recovery) when the emailed code did not match — EVEN while
+        // Supabase is unreachable, so break-glass recovery never depends on
+        // Supabase uptime.
+        if (!codeOk) {
           codeOk = await verifyAppOtp(email, body.code).catch(() => false)
+          if (codeOk) serviceDown = false
         }
       } else if (mailTransport === 'resend' || mailTransport === 'mock') {
         codeOk = await verifyAppOtp(email, body.code)
