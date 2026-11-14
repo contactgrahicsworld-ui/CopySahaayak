@@ -44,7 +44,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     let payment = order.payment ? { ...order.payment } : null
     let orderStatus = order.status
     const paymentId = order.payment?.id
-    if (payment && paymentId && ['PENDING', 'SUBMITTED'].includes(payment.status) && payment.gatewayRef) {
+    if (payment && paymentId && ['PENDING', 'SUBMITTED', 'REJECTED'].includes(payment.status) && payment.gatewayRef) {
       const rec = await reconcileOrderPaymentFromGateway(paymentId).catch(() => null)
       if (rec?.advanced) {
         gatewayReconciled = true

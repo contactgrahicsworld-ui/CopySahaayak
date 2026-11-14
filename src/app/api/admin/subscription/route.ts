@@ -33,7 +33,7 @@ export async function GET(req: Request) {
     // redirected back, but the webhook hasn't landed. Ask the gateway directly
     // (throttled server-side to one call / payment / 20 s across all instances).
     let gatewayReconciled = false
-    const openGatewayPayment = payments.find((p) => p.status === 'PENDING' && p.gatewayRef)
+    const openGatewayPayment = payments.find((p) => ['PENDING', 'REJECTED'].includes(p.status) && p.gatewayRef)
     if (openGatewayPayment) {
       const rec = await reconcileSubscriptionPaymentFromGateway(openGatewayPayment.id).catch(() => null)
       if (rec?.advanced) {

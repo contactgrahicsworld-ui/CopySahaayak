@@ -81,7 +81,10 @@ export async function reconcileOrderPaymentFromGateway(paymentId: string): Promi
     db.payment.findUnique({ where: { id: paymentId }, select: { id: true, shopId: true, status: true, amountPaise: true, gatewayRef: true, gatewayCheckedAt: true } })
   ).catch(() => null)
   if (!payment) return { checked: false, advanced: false, reason: 'payment not found' }
-  if (!['PENDING', 'SUBMITTED'].includes(payment.status) || !payment.gatewayRef) {
+  // REJECTED included: a cancelled/rejected payment whose hosted checkout the
+  // customer completed anyway must still be honored when the gateway proves
+  // the money arrived — a paying customer can never be left with nothing.
+  if (!['PENDING', 'SUBMITTED', 'REJECTED'].includes(payment.status) || !payment.gatewayRef) {
     return { checked: false, advanced: false, reason: 'nothing to reconcile' }
   }
   if (!throttleDue(payment.gatewayCheckedAt)) {
@@ -131,7 +134,7 @@ export async function reconcileSubscriptionPaymentFromGateway(subPaymentId: stri
     db.subscriptionPayment.findUnique({ where: { id: subPaymentId }, select: { id: true, shopId: true, status: true, amountPaise: true, gatewayRef: true, gatewayCheckedAt: true } })
   ).catch(() => null)
   if (!sp) return { checked: false, advanced: false, reason: 'payment not found' }
-  if (sp.status !== 'PENDING' || !sp.gatewayRef) {
+  if (!['PENDING', 'REJECTED'].includes(sp.status) || !sp.gatewayRef) {
     return { checked: false, advanced: false, reason: 'nothing to reconcile' }
   }
   if (!throttleDue(sp.gatewayCheckedAt)) {
