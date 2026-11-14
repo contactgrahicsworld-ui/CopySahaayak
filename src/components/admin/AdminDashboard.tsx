@@ -18,12 +18,13 @@ import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
 import { AuthorityTransferCard } from '@/components/AuthorityTransferCard'
 import { PlanClock } from '@/components/admin/PlanClock'
 import { BackupRestoreCard } from '@/components/admin/BackupRestoreCard'
+import { ShopGatewayCard } from '@/components/admin/ShopGatewayCard'
 import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, ClipboardList, BadgeCheck, Printer, IndianRupee, BarChart3, Settings, LogOut,
   RefreshCw, FileText, Plus, QrCode, Loader2, Check, X, Store, KeyRound, MessageCircle, Download,
-  TriangleAlert, AtSign, ShieldCheck,
+  TriangleAlert, AtSign, ShieldCheck, Wallet,
 } from 'lucide-react'
 
 // wa.me deep link: works on every phone/WhatsApp Web with no API approval needed.
@@ -1105,6 +1106,7 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
     plans: Array<{ code: string; name: string; pricePaise: number; durationDays: number; features: string[] }>
     superAdminUpi: string
     superAdminPayee: string
+    gatewayConfigured?: boolean
   } | null>(null)
   const [payPlan, setPayPlan] = useState<{ code: string; name: string; pricePaise: number } | null>(null)
   const [utr, setUtr] = useState('')
@@ -1211,6 +1213,29 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
     setUtr('')
   }
 
+  // YouPI gateway checkout for the plan payment: session created server-side,
+  // browser gets only the hosted checkoutUrl. The signed webhook auto-activates
+  // the plan on verification — no UTR, no waiting for manual checks.
+  const [gwPaying, setGwPaying] = useState(false)
+  async function payPlanViaGateway() {
+    if (!payPlan) return
+    setGwPaying(true)
+    try {
+      const res = await fetch('/api/admin/subscription/gateway-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planCode: payPlan.code }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Gateway session failed')
+      window.location.href = data.checkoutUrl as string
+      return
+    } catch (err) {
+      toast({ title: 'Gateway se pay nahi ho paya', description: err instanceof Error ? err.message : '', variant: 'destructive' })
+      setGwPaying(false)
+    }
+  }
+
   async function downgradeToFree() {
     setDowngrading(true)
     try {
@@ -1230,6 +1255,7 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
   return (
     <div className="space-y-4">
       <BackupRestoreCard scope="SHOP" title="Business Backup & Restore — apna poora data (Excel + system file)" />
+      <ShopGatewayCard />
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2"><QrCode className="h-4 w-4" aria-hidden /> Your shop QR code</CardTitle>
@@ -1350,6 +1376,17 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {sub?.gatewayConfigured && (
+              <Button type="button" className="w-full" onClick={payPlanViaGateway} disabled={gwPaying}>
+                {gwPaying ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" aria-hidden /> : <Wallet className="h-4 w-4 mr-1.5" aria-hidden />}
+                Gateway se Pay karein — Auto-Activate (GPay/PhonePe/Paytm)
+              </Button>
+            )}
+            {sub?.gatewayConfigured && (
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="h-px flex-1 bg-border" aria-hidden /> ya UPI QR se pay karein <span className="h-px flex-1 bg-border" aria-hidden />
+              </div>
+            )}
             {payQrErr && (
               <p className="text-sm rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2">{payQrErr}</p>
             )}

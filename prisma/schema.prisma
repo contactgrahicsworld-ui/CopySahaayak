@@ -112,6 +112,13 @@ model Shop {
   logoPath     String?
   upiVpa       String? // UPI ID for order payments
   upiPayeeName String?
+  // YouPI PG gateway (customer -> shop order payments). Keys are SERVER-ONLY:
+  // only youpiPublicKey is ever sent to the browser (checkout bootstrap).
+  youpiEnabled       Boolean @default(false)
+  youpiMerchantId    String?
+  youpiApiKey        String?
+  youpiWebhookSecret String?
+  youpiPublicKey     String?
   isActive     Boolean  @default(true)
   suspendedReason String?
   createdAt    DateTime @default(now())
@@ -200,9 +207,12 @@ model SubscriptionPayment {
   subscriptionId   String?
   subscription     Subscription? @relation(fields: [subscriptionId], references: [id])
   amountPaise      Int
-  utr              String
+  utr              String? // null for gateway-initiated payments (UTR arrives via webhook)
   payerName        String?
   screenshotPath   String?
+  // YouPI PG gateway linkage (shop -> platform plan payments).
+  gatewayRef       String?
+  verifiedVia      String?
   status           String // PENDING | VERIFIED | REJECTED
   rejectionReason  String?
   verifiedByUserId String?
@@ -354,6 +364,10 @@ model Payment {
   utr            String?
   payerName      String?
   screenshotPath String?
+  // YouPI PG gateway linkage: gatewayRef = gateway paymentId; verifiedVia =
+  // MANUAL (shop admin) | GATEWAY (signed webhook auto-advance).
+  gatewayRef     String?
+  verifiedVia    String?
   status         String // PENDING | SUBMITTED | VERIFIED | REJECTED
   rejectionReason String?
   submittedAt    DateTime?
@@ -639,5 +653,25 @@ model BackupChunk {
   payload String
 
   @@unique([jobId, idx])
+  @@schema("csp")
+}
+
+// YouPI PG gateway webhook deliveries — dedupe on gateway deliveryId (the
+// gateway retries with backoff; deliveries are byte-identical on retry).
+model GatewayEvent {
+  id           String   @id @default(cuid())
+  deliveryId   String   @unique
+  event        String
+  scope        String   // ORDER | SUBSCRIPTION
+  targetId     String?  // Payment.id | SubscriptionPayment.id
+  gatewayRef   String?
+  amountPaise  Int?
+  utr          String?
+  accepted     Boolean  @default(false) // true = advanced the payment workflow
+  reason       String?  // why not accepted (event filter / amount mismatch …)
+  payloadJson  String
+  receivedAt   DateTime @default(now())
+
+  @@index([targetId])
   @@schema("csp")
 }

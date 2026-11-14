@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import { ChangePasswordDialog } from '@/components/ChangePasswordDialog'
 import { ChangeEmailDialog } from '@/components/ChangeEmailDialog'
 import { AuthorityTransferCard } from '@/components/AuthorityTransferCard'
@@ -915,6 +916,15 @@ function PlatformSettingsTab() {
     { key: 'order_prefix', label: 'Order number prefix' },
   ]
 
+  // YouPI PG gateway — subscription (shop→platform) payments + shared server URL.
+  const gatewayFields: Array<{ key: string; label: string; hint?: string }> = [
+    { key: 'youpi_api_url', label: 'Gateway server URL (YouPI PG)', hint: 'Jahan aapka YouPI server chal raha hai, e.g. https://pay.aapkadomain.com' },
+    { key: 'youpi_merchant_id', label: 'Gateway Merchant ID (platform merchant)', hint: 'YouPI admin me subscriptions ke liye banaya merchant (receiving account = platform UPI)' },
+    { key: 'youpi_merchant_api_key', label: 'Gateway API key (server-only)', hint: 'YouPI merchant API key — kabhi browser ya customer ko nahi jati' },
+    { key: 'youpi_webhook_secret', label: 'Gateway webhook secret (server-only)', hint: 'YouPI merchant ka webhook secret — signed webhook verification ke liye' },
+    { key: 'youpi_public_key', label: 'Gateway public key', hint: 'Checkout bootstrap ke liye public key' },
+  ]
+
   return (
     <Card className="max-w-xl">
       <CardHeader className="pb-2"><CardTitle className="text-base">Platform settings</CardTitle></CardHeader>
@@ -939,6 +949,29 @@ function PlatformSettingsTab() {
               {f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
             </div>
           ))}
+          <Separator className="my-2" />
+          <div>
+            <p className="text-sm font-medium">YouPI PG Gateway — plan payments (shop → platform)</p>
+            <p className="text-xs text-muted-foreground">Configured hone par shop owners checkout page se pay karenge aur gateway verify hote hi plan AUTO-ACTIVATE hoga (UTR manually check karne ki zaroorat nahi). Manual UTR tarika fallback me available rahega.</p>
+          </div>
+          {gatewayFields.map((f) => (
+            <div key={f.key} className="space-y-1">
+              <Label>{f.label}</Label>
+              <Input value={form[f.key] || ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+              {f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
+            </div>
+          ))}
+          <div className="space-y-1">
+            <Label>Gateway verification strictness</Label>
+            <Select value={form['youpi_accept_observed'] === '1' ? '1' : '0'} onValueChange={(v) => setForm({ ...form, youpi_accept_observed: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Strict (recommended) — sirf bank-statement matched (RECONCILED) payments auto-activate</SelectItem>
+                <SelectItem value="1">Fast — bank SMS alert (OBSERVED_SUCCESS) bhi auto-activate kare</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">YouPI bank SMS/Gmail observers se credit detect karta hai. RECONCILED = alert aapke imported bank statement se match hua (sabse strong). Ye setting aapki trust policy hai — badal sakte hain.</p>
+          </div>
           <Button type="submit" disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Save settings</Button>
         </form>
         </>

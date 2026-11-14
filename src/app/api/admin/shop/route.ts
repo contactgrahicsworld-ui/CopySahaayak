@@ -30,6 +30,12 @@ export async function GET(req: Request) {
         upiPayeeName: shop.upiPayeeName,
         hasLogo: !!shop.logoPath,
         isActive: shop.isActive,
+        // Gateway config — secrets masked (write-only round-trip).
+        youpiEnabled: shop.youpiEnabled,
+        youpiMerchantId: shop.youpiMerchantId || '',
+        youpiApiKey: shop.youpiApiKey ? '********' : '',
+        youpiWebhookSecret: shop.youpiWebhookSecret ? '********' : '',
+        youpiPublicKey: shop.youpiPublicKey || '',
       },
     })
   })
@@ -41,6 +47,13 @@ const jsonPatchSchema = shopProfileSchema.extend({
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
   address: z.string().trim().max(300).optional().nullable(),
   upiPayeeName: z.string().trim().max(60).optional().nullable(),
+  // YouPI gateway config (shop-scope). Secrets masked on read; sending
+  // '********' back keeps the stored value untouched.
+  youpiEnabled: z.boolean().optional(),
+  youpiMerchantId: z.string().trim().max(80).optional(),
+  youpiApiKey: z.string().trim().max(200).optional(),
+  youpiWebhookSecret: z.string().trim().max(200).optional(),
+  youpiPublicKey: z.string().trim().max(200).optional(),
 })
 
 export async function PATCH(req: Request) {
@@ -88,6 +101,11 @@ export async function PATCH(req: Request) {
         ...(d.upiVpa !== undefined ? { upiVpa: d.upiVpa || null } : {}),
         ...(d.upiPayeeName !== undefined ? { upiPayeeName: d.upiPayeeName || null } : {}),
         ...(logoPath ? { logoPath } : {}),
+        ...(d.youpiEnabled !== undefined ? { youpiEnabled: d.youpiEnabled } : {}),
+        ...(d.youpiMerchantId !== undefined ? { youpiMerchantId: d.youpiMerchantId || null } : {}),
+        ...(d.youpiApiKey !== undefined && d.youpiApiKey !== '********' ? { youpiApiKey: d.youpiApiKey || null } : {}),
+        ...(d.youpiWebhookSecret !== undefined && d.youpiWebhookSecret !== '********' ? { youpiWebhookSecret: d.youpiWebhookSecret || null } : {}),
+        ...(d.youpiPublicKey !== undefined ? { youpiPublicKey: d.youpiPublicKey || null } : {}),
       },
     })
     await audit({

@@ -12,7 +12,7 @@ import { settings } from '@/lib/settings'
 import { sendOrderAlertWhatsApp, waConfigured } from '@/lib/whatsapp'
 
 /** Fire-and-forget WhatsApp owner alert — never blocks or fails the order flow. */
-function ownerAlert(
+export function ownerAlert(
   shop: { whatsappNumber: string | null },
   orderNumber: string,
   statusText: string,

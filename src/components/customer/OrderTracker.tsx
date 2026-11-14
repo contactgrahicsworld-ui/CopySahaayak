@@ -1,12 +1,16 @@
 'use client'
 
 // Live order tracking for the customer: polls status every 8 seconds.
+// If the shop runs the YouPI gateway, a "Pay Online" action opens the hosted
+// checkout (server-side session create — no keys in the browser). The customer
+// returns via the gateway's returnUrl and this page's 8s polling shows the
+// auto-advanced status (gateway webhook verified the payment).
 import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { CheckCircle2, Clock, CircleDashed, Printer, XCircle, IndianRupee } from 'lucide-react'
+import { CheckCircle2, Clock, CircleDashed, Printer, XCircle, IndianRupee, Wallet, Loader2 } from 'lucide-react'
 
 interface TrackedOrder {
   orderNumber: string
@@ -28,11 +32,26 @@ interface TrackedOrder {
 
 const STATUS_FLOW = ['PENDING_PAYMENT', 'AWAITING_VERIFICATION', 'CONFIRMED', 'COMPLETED']
 
-export function OrderTracker({ slug, shopName, orderNumber }: { slug: string; shopName: string; orderNumber: string }) {
+export function OrderTracker({ slug, shopName, orderNumber, gatewayEnabled = false }: { slug: string; shopName: string; orderNumber: string; gatewayEnabled?: boolean }) {
   const [order, setOrder] = useState<TrackedOrder | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notAuthorized, setNotAuthorized] = useState(false)
   const [phone, setPhone] = useState('')
+  const [paying, setPaying] = useState(false)
+
+  async function payOnline() {
+    setPaying(true)
+    try {
+      const res = await fetch(`/api/shops/${slug}/orders/${orderNumber}/gateway-session`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Payment session could not start')
+      window.location.href = data.checkoutUrl as string
+      return // navigating away; spinner stays
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gateway se connect nahi ho paya — UPI QR use karein')
+      setPaying(false)
+    }
+  }
 
   useEffect(() => {
     let stop = false
@@ -113,6 +132,15 @@ export function OrderTracker({ slug, shopName, orderNumber }: { slug: string; sh
 
         <Card>
           <CardContent className="pt-4 space-y-4">
+            {order.status === 'PENDING_PAYMENT' && gatewayEnabled && (
+              <div className="space-y-2">
+                <Button type="button" className="w-full" onClick={payOnline} disabled={paying}>
+                  {paying ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" aria-hidden /> : <Wallet className="h-4 w-4 mr-1.5" aria-hidden />}
+                  Online Pay karein — UPI Gateway (GPay/PhonePe/Paytm)
+                </Button>
+                <p className="text-[11px] text-muted-foreground text-center">Gateway verify karte hi order apne-aap confirm ho jayega. UPI QR se bhi pay kar sakte hain.</p>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">स्थिति / Status</span>
               {rejected ? (

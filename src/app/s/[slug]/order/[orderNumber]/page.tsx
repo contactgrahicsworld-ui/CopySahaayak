@@ -12,5 +12,5 @@ export default async function OrderTrackingPage({
   const { slug, orderNumber } = await params
   const shop = await db.shop.findUnique({ where: { slug } })
   if (!shop) notFound()
-  return <OrderTracker slug={slug} shopName={shop.name} orderNumber={orderNumber} />
+  return <OrderTracker slug={slug} shopName={shop.name} orderNumber={orderNumber} gatewayEnabled={shop.youpiEnabled} />
 }
