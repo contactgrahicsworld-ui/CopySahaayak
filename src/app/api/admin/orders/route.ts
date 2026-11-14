@@ -25,7 +25,7 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
       take,
       include: {
-        payment: { select: { id: true, status: true, utr: true, amountPaise: true, verifiedAt: true, rejectionReason: true } },
+        payment: { select: { id: true, status: true, utr: true, amountPaise: true, verifiedAt: true, rejectionReason: true, verifiedVia: true } },
         items: {
           select: {
             id: true,

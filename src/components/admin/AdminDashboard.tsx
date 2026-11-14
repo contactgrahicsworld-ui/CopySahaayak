@@ -463,6 +463,7 @@ interface PaymentRow {
   payerName?: string
   rejectionReason?: string
   submittedAt?: string
+  verifiedVia?: string
   order: { orderNumber: string; totalPaise: number; customerName?: string; customerPhone?: string }
 }
 
@@ -539,6 +540,9 @@ function PaymentsTab() {
                     {p.payerName ? ` · ${p.payerName}` : ''}
                     {p.submittedAt ? ` · ${new Date(p.submittedAt).toLocaleString('en-IN')}` : ''}
                   </p>
+                  {p.verifiedVia === 'GATEWAY' && (
+                    <p className="text-xs text-emerald-700 flex items-center gap-1"><Wallet className="h-3 w-3" aria-hidden /> Gateway ne auto-verify kiya — koi action nahi</p>
+                  )}
                   {p.rejectionReason && <p className="text-xs text-red-600">{p.rejectionReason}</p>}
                 </div>
                 <div className="flex items-center gap-2">

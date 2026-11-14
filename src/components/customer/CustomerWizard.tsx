@@ -14,12 +14,12 @@ import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import {
   FileUp, FileText, ImageIcon, Loader2, IndianRupee, Trash2, CheckCircle2,
-  Clock, Printer, Copy, ArrowLeft,
+  Clock, Printer, Copy, ArrowLeft, Wallet,
 } from 'lucide-react'
 import type { ColorMode, PaperSize } from '@/lib/constants'
 
 interface PricingRule { paperSize: PaperSize; colorMode: ColorMode; singleSidedPaise: number; duplexPaise: number }
-interface ShopInfo { name: string; slug: string; phone?: string | null; address?: string | null; upiConfigured: boolean }
+interface ShopInfo { name: string; slug: string; phone?: string | null; address?: string | null; upiConfigured: boolean; gatewayEnabled: boolean }
 
 interface DocItem {
   key: string
@@ -61,6 +61,7 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
   const [utr, setUtr] = useState('')
   const [submittingUtr, setSubmittingUtr] = useState(false)
   const [utrSkipped, setUtrSkipped] = useState(false)
+  const [payingGateway, setPayingGateway] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const priceOf = useCallback(
@@ -204,6 +205,25 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
     window.scrollTo({ top: 0 })
   }
 
+  // Gateway checkout: session is created server-side (keys never touch the
+  // browser) and the customer is redirected to the hosted checkout. When the
+  // gateway verifies the credit, the signed webhook confirms the order and
+  // print jobs queue automatically — this page's DONE/tracker view shows it.
+  async function payOnline() {
+    if (!order) return
+    setPayingGateway(true)
+    try {
+      const res = await fetch(`/api/shops/${slug}/orders/${order.orderNumber}/gateway-session`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Payment session could not start')
+      window.location.href = data.checkoutUrl as string
+      return
+    } catch (err) {
+      toast({ title: 'Gateway se pay nahi ho paya', description: err instanceof Error ? err.message : 'UPI QR tarika use karein', variant: 'destructive' })
+      setPayingGateway(false)
+    }
+  }
+
   if (stage === 'PAY' && order) {
     return (
       <PayStage
@@ -215,6 +235,8 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
         onSubmit={submitUtr}
         onSkip={skipUtr}
         onBack={() => setStage('CONFIG')}
+        gatewayPaying={payingGateway}
+        onPayOnline={payOnline}
       />
     )
   }
@@ -450,7 +472,7 @@ export function CustomerWizard({ shop, pricing }: { shop: ShopInfo; pricing: Pri
 }
 
 function PayStage({
-  shop, order, utr, setUtr, submitting, onSubmit, onSkip, onBack,
+  shop, order, utr, setUtr, submitting, onSubmit, onSkip, onBack, gatewayPaying, onPayOnline,
 }: {
   shop: ShopInfo
   order: PlacedOrder
@@ -460,9 +482,14 @@ function PayStage({
   onSubmit: () => void
   onSkip: () => void
   onBack: () => void
+  gatewayPaying: boolean
+  onPayOnline: () => void
 }) {
   const { toast } = useToast()
-  if (!shop.upiConfigured || !order.upi) {
+  // Gateway shops: online payment is THE path — QR/UTR clutter is hidden behind
+  // an opt-in expand (edge cases / gateway downtime), cash stays one tap.
+  const [showManualUpi, setShowManualUpi] = useState(false)
+  if (!shop.upiConfigured && !shop.gatewayEnabled) {
     return (
       <main className="min-h-screen flex items-center justify-center p-4">
         <Card className="max-w-sm w-full">
@@ -488,11 +515,29 @@ function PayStage({
                 <IndianRupee className="h-8 w-8" aria-hidden />{(order.totalPaise / 100).toFixed(2)}
               </p>
             </div>
-            {order.qrDataUrl && (
-              <div className="mx-auto bg-white p-3 rounded-xl w-fit border shadow-sm">
-                <img src={order.qrDataUrl} alt={`UPI QR code to pay ₹${(order.totalPaise / 100).toFixed(2)} to ${order.upi.payeeName}`} className="h-56 w-56 sm:h-64 sm:w-64" />
+            {shop.gatewayEnabled && (
+              <div className="space-y-2">
+                <Button className="w-full h-12 text-base" size="lg" onClick={onPayOnline} disabled={gatewayPaying}>
+                  {gatewayPaying ? <Loader2 className="h-5 w-5 mr-1.5 animate-spin" aria-hidden /> : <Wallet className="h-5 w-5 mr-1.5" aria-hidden />}
+                  Online Pay karein — UPI Gateway
+                </Button>
+                <p className="text-xs text-muted-foreground">GPay / PhonePe / Paytm — gateway verify karte hi order apne-aap confirm ho jayega aur print shuru ho jayega.</p>
+                <Button variant="outline" className="w-full h-11" onClick={onSkip}>
+                  नकद / दुकान पर दे दिया
+                  <span className="block text-[11px] text-muted-foreground">Paying cash at the counter — continue without online payment</span>
+                </Button>
+                <button type="button" className="text-xs text-muted-foreground underline underline-offset-2" onClick={() => setShowManualUpi((v) => !v)}>
+                  {showManualUpi ? 'UPI QR chhupaein' : 'UPI QR se pay karna hai? (backup tarika)'}
+                </button>
               </div>
             )}
+            {(!shop.gatewayEnabled || showManualUpi) && order.qrDataUrl && (
+              <div className="mx-auto bg-white p-3 rounded-xl w-fit border shadow-sm">
+                <img src={order.qrDataUrl} alt={`UPI QR code to pay ₹${(order.totalPaise / 100).toFixed(2)} to ${order.upi?.payeeName || 'shop'}`} className="h-56 w-56 sm:h-64 sm:w-64" />
+              </div>
+            )}
+            {(!shop.gatewayEnabled || showManualUpi) && (
+            <>
             <ol className="text-left space-y-2 max-w-xs mx-auto" aria-label="Payment steps">
               <li className="flex gap-2.5 text-sm">
                 <span className="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs">1</span>
@@ -500,18 +545,18 @@ function PayStage({
               </li>
               <li className="flex gap-2.5 text-sm">
                 <span className="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs">2</span>
-                <span>पूरी रकम भेज दें — पैसा सीधा दुकान के खाते में जाएगा<span className="block text-xs text-muted-foreground">Pay the exact amount — it goes directly to {shop.name} ({order.upi.payeeName})</span></span>
+                <span>पूरी रकम भेज दें — पैसा सीधा दुकान के खाते में जाएगा<span className="block text-xs text-muted-foreground">Pay the exact amount — it goes directly to {shop.name} ({order.upi?.payeeName || 'shop'})</span></span>
               </li>
               <li className="flex gap-2.5 text-sm">
                 <span className="shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs">3</span>
                 <span>पेमेंट होने के बाद UTR डालें — या UTR न हो तो सीधे नीचे वाला बटन दबाएं<span className="block text-xs text-muted-foreground">Enter the UTR after paying — or press the button below if you have none</span></span>
               </li>
             </ol>
-            <a href={order.upi.payload} className="block">
+            <a href={order.upi?.payload || ''} className="block">
               <Button variant="outline" className="w-full h-11">इसी फ़ोन से भुगतान करें — Open UPI app</Button>
             </a>
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <span className="font-mono text-foreground">{order.upi.vpa}</span>
+              <span className="font-mono text-foreground">{order.upi?.vpa || ''}</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -559,13 +604,19 @@ function PayStage({
               {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4 mr-2" aria-hidden />}
               मैंने भुगतान कर दिया — I have paid
             </Button>
-            <div className="relative text-center">
-              <span className="text-[11px] text-muted-foreground bg-background px-2">या / or</span>
-            </div>
-            <Button variant="outline" className="w-full h-11" onClick={onSkip} disabled={submitting}>
-              भुगतान नकद/सीधे दुकान को दिया — UTR के बिना आगे बढ़ें
-              <span className="block text-[11px] text-muted-foreground">Paying cash or directly at the shop — continue without a UTR</span>
-            </Button>
+            </>
+            )}
+            {!shop.gatewayEnabled && (
+              <>
+                <div className="relative text-center">
+                  <span className="text-[11px] text-muted-foreground bg-background px-2">या / or</span>
+                </div>
+                <Button variant="outline" className="w-full h-11" onClick={onSkip} disabled={submitting}>
+                  भुगतान नकद/सीधे दुकान को दिया — UTR के बिना आगे बढ़ें
+                  <span className="block text-[11px] text-muted-foreground">Paying cash or directly at the shop — continue without a UTR</span>
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

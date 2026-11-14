@@ -44,6 +44,7 @@ export default async function ShopOrderPage({ params }: { params: Promise<{ slug
         phone: shop.phone,
         address: shop.address,
         upiConfigured: !!shop.upiVpa,
+        gatewayEnabled: shop.youpiEnabled,
       }}
       pricing={shop.pricingRules.map((r) => ({
         paperSize: r.paperSize as import('@/lib/constants').PaperSize,

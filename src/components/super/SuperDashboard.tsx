@@ -594,10 +594,12 @@ function UsersTab({ selfEmail }: { selfEmail: string }) {
 interface SubPaymentRow {
   id: string
   amountPaise: number
-  utr: string
+  utr: string | null
   payerName?: string
   status: string
   createdAt: string
+  verifiedVia?: string
+  gatewayRef?: string
   shop: { name: string; slug: string; phone?: string }
   plan: { name: string; code: string; durationDays: number }
 }
@@ -661,8 +663,11 @@ function SubsTab() {
                 <div>
                   <p className="font-semibold text-sm">{p.shop.name} · {p.plan.name} · {formatInr(p.amountPaise)}</p>
                   <p className="text-xs text-muted-foreground">
-                    UTR <strong className="text-foreground">{p.utr}</strong>{p.payerName ? ` · ${p.payerName}` : ''} · {new Date(p.createdAt).toLocaleString('en-IN')}
+                    UTR <strong className="text-foreground">{p.utr || '— (gateway)'} </strong>{p.payerName ? ` · ${p.payerName}` : ''} · {new Date(p.createdAt).toLocaleString('en-IN')}
                   </p>
+                  {p.verifiedVia === 'GATEWAY' && (
+                    <p className="text-xs text-emerald-700">Gateway ne auto-verify kiya (ref {p.gatewayRef || '—'}) — plan auto-activated</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={p.status === 'VERIFIED' ? 'default' : p.status === 'PENDING' ? 'secondary' : 'destructive'}>{p.status}</Badge>

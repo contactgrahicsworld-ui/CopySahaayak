@@ -18,7 +18,9 @@ export async function GET(req: Request) {
       where: status !== 'ALL' ? { status } : {},
       orderBy: { createdAt: 'desc' },
       take: 100,
-      include: {
+      select: {
+        id: true, status: true, amountPaise: true, utr: true, payerName: true, rejectionReason: true,
+        verifiedVia: true, gatewayRef: true, createdAt: true, verifiedAt: true,
         shop: { select: { id: true, name: true, slug: true, phone: true } },
         plan: { select: { name: true, code: true, pricePaise: true, durationDays: true } },
       },
