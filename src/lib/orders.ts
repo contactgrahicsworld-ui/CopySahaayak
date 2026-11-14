@@ -297,17 +297,26 @@ export async function enqueuePrintJobs(orderId: string) {
     const existing = await db.printJob.findFirst({ where: { orderItemId: item.id, status: { in: ['QUEUED', 'CLAIMED', 'SPOOLING', 'COMPLETED'] } } })
     if (existing) continue // idempotent fan-out
 
-    await db.printJob.create({
-      data: {
-        shopId: order.shopId,
-        orderId: order.id,
-        orderItemId: item.id,
-        documentId: item.documentId,
-        printerId: printer || null,
-        status: printer ? 'QUEUED' : 'QUEUED',
-        spoolDocumentName: `PCS-${order.orderNumber.replace(/[^A-Z0-9]/gi, '')}-${item.id.slice(-6).toUpperCase()}`,
-      },
-    })
+    try {
+      await db.printJob.create({
+        data: {
+          shopId: order.shopId,
+          orderId: order.id,
+          orderItemId: item.id,
+          documentId: item.documentId,
+          printerId: printer || null,
+          status: printer ? 'QUEUED' : 'QUEUED',
+          spoolDocumentName: `PCS-${order.orderNumber.replace(/[^A-Z0-9]/gi, '')}-${item.id.slice(-6).toUpperCase()}`,
+        },
+      })
+    } catch (err) {
+      // @@unique([orderItemId]) makes the fan-out race-free at the DB level:
+      // if a concurrent fan-out (e.g. two gateway deliveries racing) created
+      // the job between our findFirst and our create, the loser lands here and
+      // must treat the item as done — not crash the whole fan-out.
+      if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002') continue
+      throw err
+    }
   }
 }
 

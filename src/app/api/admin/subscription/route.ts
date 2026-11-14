@@ -1,5 +1,7 @@
 // Shop subscription: view current plan + submit renewal payment (UTR) for
-// Super Admin verification. Activates only after manual verification.
+// Super Admin verification. Activates only after manual verification — OR
+// instantly when the gateway webhook (or the pull-based reconciliation below)
+// confirms the gateway payment.
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireAnyShopAdmin } from '@/lib/auth'
@@ -8,13 +10,14 @@ import { getClientIp } from '@/lib/security'
 import { z } from 'zod'
 import { settings } from '@/lib/settings'
 import { getPlatformYoupiConfig } from '@/lib/youpi'
+import { reconcileSubscriptionPaymentFromGateway } from '@/lib/gateway-reconcile'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   return handleRoute(req, {}, async () => {
     const ctx = await requireAnyShopAdmin()
-    const subscription = await db.subscription.findUnique({
+    let subscription = await db.subscription.findUnique({
       where: { shopId: ctx.user.shopId },
       include: { plan: true },
     })
@@ -25,6 +28,33 @@ export async function GET(req: Request) {
       take: 20,
       include: { plan: { select: { name: true, code: true } } },
     })
+
+    // WEBHOOK-MISSED SAFETY NET: the shop paid via hosted checkout, was
+    // redirected back, but the webhook hasn't landed. Ask the gateway directly
+    // (throttled server-side to one call / payment / 20 s across all instances).
+    let gatewayReconciled = false
+    const openGatewayPayment = payments.find((p) => p.status === 'PENDING' && p.gatewayRef)
+    if (openGatewayPayment) {
+      const rec = await reconcileSubscriptionPaymentFromGateway(openGatewayPayment.id).catch(() => null)
+      if (rec?.advanced) {
+        gatewayReconciled = true
+        const [freshSub, freshPayments] = await Promise.all([
+          db.subscription.findUnique({ where: { shopId: ctx.user.shopId }, include: { plan: true } }),
+          db.subscriptionPayment.findMany({
+            where: { shopId: ctx.user.shopId },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+            include: { plan: { select: { name: true, code: true } } },
+          }),
+        ])
+        subscription = freshSub
+        if (freshPayments) {
+          payments.length = 0
+          payments.push(...freshPayments)
+        }
+      }
+    }
+
     const s = await settings.all()
     const gatewayCfg = await getPlatformYoupiConfig()
     return jsonOk(
@@ -40,6 +70,7 @@ export async function GET(req: Request) {
         // Gateway available? The shop can pay the plan via YouPI checkout and
         // the signed webhook auto-activates the plan — no UTR wait.
         gatewayConfigured: Boolean(gatewayCfg),
+        gatewayReconciled,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     )
@@ -95,5 +126,37 @@ export async function POST(req: Request) {
       ip: getClientIp(req),
     })
     return jsonOk({ ok: true, paymentId: payment.id })
+  })
+}
+
+// Cancel MY OWN open PENDING subscription payment. Without this, an abandoned
+// gateway checkout or a UTR the super admin never got to would leave a PENDING
+// row that blocks BOTH payment paths forever ("you already have a payment
+// awaiting verification") — a permanent lockout. Only PENDING can be cancelled
+// (verified/rejected rows are history), and only the owning shop can do it.
+export async function DELETE(req: Request) {
+  return handleRoute(req, {}, async () => {
+    const ctx = await requireAnyShopAdmin()
+    // Atomic conditional cancel: if a gateway webhook verifies the payment in
+    // the same instant, the claim loses (count 0) and the money is honored —
+    // a cancel can never race away a verified payment.
+    const claim = await db.subscriptionPayment.updateMany({
+      where: { shopId: ctx.user.shopId, status: 'PENDING' },
+      data: { status: 'REJECTED', rejectionReason: 'Cancelled by shop (payment not completed)' },
+    })
+    if (claim.count === 0) {
+      return jsonError(409, 'Koi open payment cancel karne ko nahi hai (already verified/rejected)')
+    }
+    await audit({
+      shopId: ctx.user.shopId,
+      userId: ctx.user.id,
+      actorType: 'USER',
+      action: 'SUBSCRIPTION_PAYMENT_CANCELLED',
+      entity: 'SubscriptionPayment',
+      entityId: '-',
+      meta: { by: ctx.user.email },
+      ip: getClientIp(req),
+    })
+    return jsonOk({ ok: true })
   })
 }

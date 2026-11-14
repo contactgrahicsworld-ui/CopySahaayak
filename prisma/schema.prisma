@@ -220,6 +220,10 @@ model SubscriptionPayment {
   verifiedAt       DateTime?
   notes            String?
   createdAt        DateTime  @default(now())
+  // Last time the platform asked the gateway API for this payment's live
+  // status (pull-based reconciliation when a webhook was missed). Throttle
+  // anchor: at most one gateway check per payment per RECONCILE_THROTTLE_MS.
+  gatewayCheckedAt DateTime?
 
   @@index([shopId])
   @@index([status])
@@ -376,6 +380,10 @@ model Payment {
   verifiedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  // Last time the platform asked the gateway API for this payment's live
+  // status (pull-based reconciliation when a webhook was missed). Throttle
+  // anchor: at most one gateway check per payment per RECONCILE_THROTTLE_MS.
+  gatewayCheckedAt DateTime?
 
   verifications PaymentVerification[]
 
@@ -493,6 +501,9 @@ model PrintJob {
 
   events PrintEvent[]
 
+  // One print job per order item — DB-level guarantee that a concurrent
+  // double fan-out (two gateway deliveries racing) can never create two jobs.
+  @@unique([orderItemId])
   @@index([shopId, status])
   @@index([deviceId, status])
   @@index([shopId, status, createdAt])

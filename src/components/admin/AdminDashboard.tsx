@@ -1108,9 +1108,11 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
   const [sub, setSub] = useState<{
     subscription: { status: string; expiresAt: string | null; plan: { name: string; pricePaise: number } } | null
     plans: Array<{ code: string; name: string; pricePaise: number; durationDays: number; features: string[] }>
+    payments?: Array<{ id: string; status: string }>
     superAdminUpi: string
     superAdminPayee: string
     gatewayConfigured?: boolean
+    gatewayReconciled?: boolean
   } | null>(null)
   const [payPlan, setPayPlan] = useState<{ code: string; name: string; pricePaise: number } | null>(null)
   const [utr, setUtr] = useState('')
@@ -1240,6 +1242,25 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
     }
   }
 
+  // Escape hatch for the "payment awaiting verification" lockout: cancel the
+  // stuck PENDING row so a fresh gateway checkout or UTR can be started. If
+  // the money actually arrived (webhook lands later), the plan still activates.
+  const [cancellingSubPay, setCancellingSubPay] = useState(false)
+  async function cancelPendingSubPayment() {
+    setCancellingSubPay(true)
+    try {
+      const res = await fetch('/api/admin/subscription', { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Cancel failed')
+      toast({ title: 'Atka hua payment cancel ho gaya', description: 'Ab naya payment shuru kar sakte hain.' })
+      fetch('/api/admin/subscription', { cache: 'no-store' }).then((r) => r.json()).then(setSub)
+    } catch (err) {
+      toast({ title: 'Cancel failed', description: err instanceof Error ? err.message : '', variant: 'destructive' })
+    } finally {
+      setCancellingSubPay(false)
+    }
+  }
+
   async function downgradeToFree() {
     setDowngrading(true)
     try {
@@ -1359,6 +1380,21 @@ function SettingsTab({ shop }: { shop: ShopProp }) {
               </Card>
             ))}
           </div>
+          {/* Stuck-payment escape hatch: an abandoned gateway checkout or an
+              unverified UTR leaves a PENDING row that blocks both payment
+              paths. The shop can always cancel it and start fresh — a webhook
+              proving the money DID arrive will still activate the plan. */}
+          {sub?.payments?.some((p) => p.status === 'PENDING') && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2">
+              <p className="text-sm text-amber-900 flex-1">
+                Ek payment abhi verification me atka hai. Agar aapne gateway checkout chhod diya tha ya UTR galat tha, ise cancel karke naya payment shuru karein.
+              </p>
+              <Button size="sm" variant="outline" className="shrink-0 border-amber-400 text-amber-900 hover:bg-amber-100" disabled={cancellingSubPay} onClick={cancelPendingSubPayment}>
+                {cancellingSubPay ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" aria-hidden /> : <X className="h-4 w-4 mr-1.5" aria-hidden />}
+                Cancel atka hua payment
+              </Button>
+            </div>
+          )}
           {sub?.subscription?.plan && sub.subscription.plan.pricePaise > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-md border px-3 py-2">
               <p className="text-sm text-muted-foreground flex-1">
