@@ -13,12 +13,13 @@ export async function GET(req: Request) {
     const status = url.searchParams.get('status') || 'ACTION'
 
     // ACTION = everything the shop can act on right now: PENDING (no UTR —
-    // accept on cash/direct UPI) + SUBMITTED (UTR waiting to be verified).
+    // accept on cash/direct UPI) + SUBMITTED (UTR waiting to be verified) +
+    // REFUND_DUE (money-safety engine flagged a refund the shop must send).
     const where =
       status === 'ALL'
         ? { shopId }
         : status === 'ACTION'
-          ? { shopId, status: { in: ['PENDING', 'SUBMITTED'] } }
+          ? { shopId, status: { in: ['PENDING', 'SUBMITTED', 'REFUND_DUE'] } }
           : { shopId, status }
 
     const payments = await db.payment.findMany({

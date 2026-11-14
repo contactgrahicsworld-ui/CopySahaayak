@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast'
 import { formatInr } from '@/lib/constants'
 import {
   LayoutDashboard, Store, BadgeCheck, Layers, ScrollText, Settings, LogOut, Loader2,
-  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2, AtSign, Undo2,
+  Plus, RefreshCw, ShieldCheck, ShieldOff, KeyRound, Check, X, Users, Trash2, AtSign, Undo2, IndianRupee,
 } from 'lucide-react'
 
 export function SuperDashboard({ user }: { user: { name: string; email: string } }) {
@@ -610,6 +610,30 @@ function SubsTab() {
   const [status, setStatus] = useState('PENDING')
   const [verify, setVerify] = useState<{ p: SubPaymentRow; action: 'VERIFY' | 'REJECT' } | null>(null)
   const [note, setNote] = useState('')
+  // Money-safety refund (shop → platform duplicate/unmatched capture).
+  const [refundUtr, setRefundUtr] = useState<{ id: string; shop: string; amountPaise: number; utr: string } | null>(null)
+  const [refundBusy, setRefundBusy] = useState(false)
+
+  async function submitRefund() {
+    if (!refundUtr) return
+    setRefundBusy(true)
+    try {
+      const res = await fetch('/api/super/subpayments/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: refundUtr.id, refundUtr: refundUtr.utr.trim() || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      toast({ title: 'Refunded mark ho gaya', description: `${refundUtr.shop} ko plan payment wapas kiya gaya.` })
+      setRefundUtr(null)
+      load()
+    } catch (err) {
+      toast({ title: 'Failed', description: err instanceof Error ? err.message : 'Try again', variant: 'destructive' })
+    } finally {
+      setRefundBusy(false)
+    }
+  }
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/super/subpayments?status=${status}`, { cache: 'no-store' })
@@ -649,7 +673,7 @@ function SubsTab() {
       <div className="flex gap-2 items-center">
         <Select value={status} onValueChange={setStatus}>
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>{['PENDING', 'VERIFIED', 'REJECTED', 'ALL'].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+          <SelectContent>{['PENDING', 'VERIFIED', 'REJECTED', 'REFUND_DUE', 'REFUNDED', 'ALL'].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
         </Select>
         <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4" aria-hidden /></Button>
       </div>
@@ -668,14 +692,25 @@ function SubsTab() {
                   {p.verifiedVia === 'GATEWAY' && (
                     <p className="text-xs text-emerald-700">Gateway ne auto-verify kiya (ref {p.gatewayRef || '—'}) — plan auto-activated</p>
                   )}
+                  {p.status === 'REFUND_DUE' && (
+                    <p className="text-xs text-amber-700">Gateway ne extra/duplicate capture pakda — shop ko wapas karein, phir Refunded mark karein.</p>
+                  )}
+                  {p.status === 'REFUNDED' && (
+                    <p className="text-xs text-green-700">Refund ho gaya.</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={p.status === 'VERIFIED' ? 'default' : p.status === 'PENDING' ? 'secondary' : 'destructive'}>{p.status}</Badge>
+                  <Badge variant={p.status === 'VERIFIED' ? 'default' : p.status === 'PENDING' ? 'secondary' : p.status === 'REFUND_DUE' ? 'outline' : 'destructive'}>{p.status}</Badge>
                   {p.status === 'PENDING' && (
                     <>
                       <Button size="sm" onClick={() => { setVerify({ p, action: 'VERIFY' }); setNote('') }}><Check className="h-4 w-4 mr-1" aria-hidden />Verify</Button>
                       <Button size="sm" variant="destructive" onClick={() => { setVerify({ p, action: 'REJECT' }); setNote('') }}><X className="h-4 w-4 mr-1" aria-hidden />Reject</Button>
                     </>
+                  )}
+                  {(p.status === 'REFUND_DUE' || p.status === 'VERIFIED') && (
+                    <Button size="sm" variant="outline" className="text-amber-700 border-amber-300" onClick={() => setRefundUtr({ id: p.id, shop: p.shop.name, amountPaise: p.amountPaise, utr: '' })}>
+                      <IndianRupee className="h-4 w-4 mr-1" aria-hidden />Refund bheja — mark karein
+                    </Button>
                   )}
                 </div>
               </CardContent>
@@ -696,6 +731,22 @@ function SubsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setVerify(null)}>Cancel</Button>
             <Button variant={verify?.action === 'VERIFY' ? 'default' : 'destructive'} onClick={submit}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!refundUtr} onOpenChange={(v) => !v && setRefundUtr(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Subscription refund mark karein</DialogTitle>
+            <DialogDescription>
+              {refundUtr?.shop} ko {refundUtr ? formatInr(refundUtr.amountPaise) : ''} wapas karein (apne UPI app se), phir refund ka UTR/reference daal kar mark karein.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1"><Label>Refund UTR / reference (optional)</Label><Input value={refundUtr?.utr || ''} onChange={(e) => setRefundUtr((r) => (r ? { ...r, utr: e.target.value } : r))} placeholder="UPI reference" /></div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundUtr(null)}>Cancel</Button>
+            <Button onClick={submitRefund} disabled={refundBusy}>{refundBusy && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Refunded mark karein</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -869,6 +920,25 @@ function PlatformSettingsTab() {
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [retryTick, setRetryTick] = useState(0)
+  // One-click gateway connectivity test (setup ease) — platform se YouPI
+  // server ke /health ko ping karta hai, result yahin dikhata hai.
+  const [gwTesting, setGwTesting] = useState(false)
+  const [gwTest, setGwTest] = useState<{ ok: boolean; latencyMs?: number; hint: string } | null>(null)
+
+  async function runGatewayTest() {
+    setGwTesting(true)
+    setGwTest(null)
+    try {
+      const res = await fetch('/api/super/gateway-test', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Test failed')
+      setGwTest({ ok: Boolean(data.ok), latencyMs: data.latencyMs, hint: data.hint || '' })
+    } catch (err) {
+      setGwTest({ ok: false, hint: err instanceof Error ? err.message : 'Test failed' })
+    } finally {
+      setGwTesting(false)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -976,6 +1046,18 @@ function PlatformSettingsTab() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">YouPI bank SMS/Gmail observers se credit detect karta hai. RECONCILED = alert aapke imported bank statement se match hua (sabse strong). Ye setting aapki trust policy hai — badal sakte hain.</p>
+          </div>
+          <div className="rounded-md border p-3 space-y-2">
+            <p className="text-sm font-medium">Gateway connection test</p>
+            <p className="text-xs text-muted-foreground">Pehle &quot;Save settings&quot; dabakar URL save karein, phir test chalayein — platform aapke YouPI server ke /health ko ping karega.</p>
+            <Button type="button" variant="outline" size="sm" onClick={runGatewayTest} disabled={gwTesting}>
+              {gwTesting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4 mr-1" aria-hidden />}Gateway test chalayein
+            </Button>
+            {gwTest && (
+              <p className={`text-xs px-2 py-1.5 rounded-md border ${gwTest.ok ? 'border-green-300 bg-green-50 text-green-800' : 'border-red-300 bg-red-50 text-red-800'}`}>
+                {gwTest.ok ? 'GATEWAY UP' : 'GATEWAY NOT REACHABLE'}{gwTest.latencyMs != null ? ` · ${gwTest.latencyMs} ms` : ''} — {gwTest.hint}
+              </p>
+            )}
           </div>
           <Button type="submit" disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Save settings</Button>
         </form>

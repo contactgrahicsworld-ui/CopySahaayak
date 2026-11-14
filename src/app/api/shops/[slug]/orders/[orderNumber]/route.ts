@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
             printJobs: { select: { id: true, status: true } },
           },
         },
-        payment: { select: { id: true, status: true, utr: true, rejectionReason: true, amountPaise: true, upiVpa: true, payeeName: true, qrPayload: true, gatewayRef: true, gatewayCheckedAt: true, verifiedVia: true } },
+        payment: { select: { id: true, status: true, utr: true, rejectionReason: true, amountPaise: true, upiVpa: true, payeeName: true, qrPayload: true, gatewayRef: true, gatewayCheckedAt: true, verifiedVia: true, refundVpa: true, refundUtr: true } },
       },
     })
     if (!order || order.shopId !== shop.id) return jsonError(404, 'Order not found')
@@ -50,7 +50,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
         gatewayReconciled = true
         const fresh = await db.payment.findUnique({
           where: { id: paymentId },
-          select: { status: true, utr: true, rejectionReason: true, amountPaise: true, upiVpa: true, payeeName: true, qrPayload: true, verifiedVia: true, order: { select: { status: true } } },
+          select: { status: true, utr: true, rejectionReason: true, amountPaise: true, upiVpa: true, payeeName: true, qrPayload: true, verifiedVia: true, refundVpa: true, refundUtr: true, order: { select: { status: true } } },
         })
         if (fresh) {
           const { order: freshOrder, ...freshPayment } = fresh
@@ -70,6 +70,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
           payeeName: payment.payeeName,
           qrPayload: payment.qrPayload,
           verifiedVia: payment.verifiedVia ?? null,
+          refundVpa: payment.refundVpa ?? null,
+          refundUtr: payment.refundUtr ?? null,
         }
       : null
 

@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server'
 import { db, retryDb } from '@/lib/db'
 import { verifyWebhookSignature, parseWebhookPayload, isAcceptableGatewayEvent, getShopYoupiConfig, getPlatformYoupiConfig } from '@/lib/youpi'
 import { advanceOrderPaymentByGateway, advanceSubscriptionByGateway } from '@/lib/gateway-verify'
+import { markOrderRefundDue, markSubRefundDue } from '@/lib/refund'
 import { rateLimitShared } from '@/lib/rate-limit'
 import { getClientIp } from '@/lib/security'
 
@@ -56,10 +57,10 @@ export async function POST(req: Request) {
   const targetId = orderId.slice(4)
 
   const paymentRow = isOrder
-    ? await retryDb(() => db.payment.findUnique({ where: { id: targetId }, select: { shopId: true, amountPaise: true } }))
+    ? await retryDb(() => db.payment.findUnique({ where: { id: targetId }, select: { shopId: true, amountPaise: true, status: true, gatewayRef: true, order: { select: { orderNumber: true } } } }))
     : null
   const subRow = isSub
-    ? await retryDb(() => db.subscriptionPayment.findUnique({ where: { id: targetId }, select: { shopId: true, amountPaise: true } }))
+    ? await retryDb(() => db.subscriptionPayment.findUnique({ where: { id: targetId }, select: { shopId: true, amountPaise: true, status: true, gatewayRef: true, plan: { select: { code: true } } } }))
     : null
   if (!paymentRow && !subRow) return reply(404, { error: 'Unknown payment reference' })
 
@@ -112,6 +113,24 @@ export async function POST(req: Request) {
       create: { deliveryId, event: String(payload.event || headers.event || ''), scope: isOrder ? 'ORDER' : 'SUBSCRIPTION', targetId, gatewayRef: payload.paymentId || null, amountPaise: observedPaise, utr: payload.utr || null, accepted: true, payloadJson: rawBody.slice(0, 20_000) },
     })
   )
+
+  // DUPLICATE-CAPTURE MONEY SAFETY: the gateway just proved a SECOND capture
+  // for a payment row that already consumed a different one (customer paid
+  // twice, or retried after a success we recorded). The extra money can never
+  // be silently dropped — flag REFUND_DUE and tell the shop/platform.
+  const currentRef = paymentRow?.gatewayRef ?? subRow?.gatewayRef
+  const currentStatus = paymentRow?.status ?? subRow?.status
+  const incomingRef = String(payload.paymentId || '')
+  if (currentStatus === 'VERIFIED' && currentRef && incomingRef && incomingRef !== currentRef) {
+    const refundMeta = { gatewayRef: incomingRef, amountPaise: expected, deliveryId }
+    if (isOrder) {
+      await markOrderRefundDue(targetId, 'duplicate-capture', { orderNumber: paymentRow?.order?.orderNumber || '', ...refundMeta })
+    } else {
+      await markSubRefundDue(targetId, 'duplicate-capture', { planCode: subRow?.plan?.code, ...refundMeta })
+    }
+    await recordEvent(deliveryId, payload, headers.event, isOrder, targetId, false, `duplicate-capture: refund due (first capture ${currentRef})`, rawBody)
+    return reply(200, { ok: true, accepted: false, refundDue: true, reason: 'duplicate capture — refund flagged' })
+  }
 
   const meta = { gatewayRef: String(payload.paymentId || ''), utr: payload.utr || undefined, deliveryId }
   const result = isOrder

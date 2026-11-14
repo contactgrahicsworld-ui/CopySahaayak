@@ -4,6 +4,7 @@ import { db, TX } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { requireAnyShopAdmin, HttpError } from '@/lib/auth'
 import { enqueuePrintJobs } from '@/lib/orders'
+import { markOrderRefundDue } from '@/lib/refund'
 import { z } from 'zod'
 import { audit } from '@/lib/audit'
 import { getClientIp } from '@/lib/security'
@@ -50,6 +51,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           await tx.order.update({ where: { id }, data: { status: 'CANCELLED' } })
           await tx.printJob.updateMany({ where: { orderId: id, status: { in: ['QUEUED', 'CLAIMED'] } }, data: { status: 'CANCELLED' } })
         }, TX)
+        // MONEY SAFETY — "customer ka paisa kabhi na fase": if the shop is
+        // cancelling an order whose money ALREADY arrived (VERIFIED, gateway
+        // or manual), the customer must get it back. Flag REFUND_DUE so the
+        // payments tab shows a refund card and the tracker asks the customer
+        // for their UPI ID. (PENDING/SUBMITTED stay as-is: the cancelled-
+        // then-paid self-heal still honours a late gateway capture.)
+        const payment = await db.payment.findUnique({ where: { orderId: id }, select: { id: true, status: true, amountPaise: true } })
+        if (payment?.status === 'VERIFIED') {
+          await markOrderRefundDue(payment.id, 'order-cancelled-after-capture', {
+            orderNumber: order.orderNumber,
+            amountPaise: payment.amountPaise,
+          })
+        }
         break
       }
       case 'COMPLETE': {

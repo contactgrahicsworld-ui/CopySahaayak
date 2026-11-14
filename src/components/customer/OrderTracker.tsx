@@ -27,7 +27,7 @@ interface TrackedOrder {
     totalPaise: number
     printJobs: Array<{ id: string; status: string }>
   }>
-  payment: { status: string; utr?: string; rejectionReason?: string; amountPaise: number } | null
+  payment: { status: string; utr?: string; rejectionReason?: string; amountPaise: number; refundVpa?: string | null; refundUtr?: string | null } | null
 }
 
 const STATUS_FLOW = ['PENDING_PAYMENT', 'AWAITING_VERIFICATION', 'CONFIRMED', 'COMPLETED']
@@ -38,6 +38,29 @@ export function OrderTracker({ slug, shopName, orderNumber, gatewayEnabled = fal
   const [notAuthorized, setNotAuthorized] = useState(false)
   const [phone, setPhone] = useState('')
   const [paying, setPaying] = useState(false)
+  // Refund flow (money-safety): when the gateway flags REFUND_DUE the
+  // customer submits their own UPI ID so the shop can send the money back.
+  const [refundVpa, setRefundVpa] = useState('')
+  const [refundSent, setRefundSent] = useState(false)
+  const [refundBusy, setRefundBusy] = useState(false)
+
+  async function submitRefundVpa() {
+    setRefundBusy(true)
+    try {
+      const res = await fetch(`/api/shops/${slug}/orders/${orderNumber}/refund-contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vpa: refundVpa.trim(), phone: phone || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Could not submit')
+      setRefundSent(true)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'UPI ID submit nahi ho payi — dobara koshish karein')
+    } finally {
+      setRefundBusy(false)
+    }
+  }
 
   async function payOnline() {
     setPaying(true)
@@ -167,6 +190,40 @@ export function OrderTracker({ slug, shopName, orderNumber, gatewayEnabled = fal
 
             {order.payment?.status === 'REJECTED' && order.payment.rejectionReason && (
               <p className="text-sm text-red-600">भुगतान नामंज़ूर: {order.payment.rejectionReason} — कृपया दुकान से संपर्क करें।</p>
+            )}
+            {order.payment?.status === 'REFUND_DUE' && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 space-y-2">
+                <p className="text-sm font-medium text-amber-900">आपके ₹{(order.payment.amountPaise / 100).toFixed(2)} वापस किए जाएँगे / Your payment will be refunded</p>
+                {order.payment.refundVpa ? (
+                  <p className="text-xs text-amber-900">आपकी UPI ID ({order.payment.refundVpa}) दुकान को मिल गई है — refund जल्द आपके UPI पर आएगा।</p>
+                ) : refundSent ? (
+                  <p className="text-xs text-amber-900">धन्यवाद! दुकान को आपकी UPI ID मिल गई है — refund जल्द आएगा।</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-amber-900">अपनी UPI ID लिखें ताकि दुकान पैसा सीधे आपके UPI पर भेज सके:</p>
+                    <input
+                      value={refundVpa}
+                      onChange={(e) => setRefundVpa(e.target.value)}
+                      placeholder="yourname@upi"
+                      className="w-full rounded-md border px-2 py-1.5 text-sm"
+                      aria-label="Your UPI ID for refund"
+                    />
+                    <button
+                      type="button"
+                      onClick={submitRefundVpa}
+                      disabled={refundBusy || !/^[a-zA-Z0-9.\-_]{2,64}@[a-zA-Z]{2,32}$/.test(refundVpa.trim())}
+                      className="w-full rounded-md bg-amber-600 px-2 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      {refundBusy ? 'भेज रहे हैं…' : 'UPI ID भेजें / Send'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {order.payment?.status === 'REFUNDED' && (
+              <p className="text-sm rounded-md border border-green-300 bg-green-50 text-green-800 px-3 py-2">
+                ₹{(order.payment.amountPaise / 100).toFixed(2)} वापस कर दिए गए हैं / Refunded to your UPI{order.payment.refundUtr ? ` (ref ${order.payment.refundUtr})` : ''}
+              </p>
             )}
             <Separator />
             {order.items.map((item) => (

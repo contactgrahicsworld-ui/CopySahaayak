@@ -224,6 +224,11 @@ model SubscriptionPayment {
   // status (pull-based reconciliation when a webhook was missed). Throttle
   // anchor: at most one gateway check per payment per RECONCILE_THROTTLE_MS.
   gatewayCheckedAt DateTime?
+  // Money-safety for shop→platform payments: duplicate capture or a
+  // verification failure after real money arrived flags REFUND_DUE; the
+  // super admin records the refund UTR here.
+  refundVpa String?
+  refundUtr String?
 
   @@index([shopId])
   @@index([status])
@@ -384,6 +389,11 @@ model Payment {
   // status (pull-based reconciliation when a webhook was missed). Throttle
   // anchor: at most one gateway check per payment per RECONCILE_THROTTLE_MS.
   gatewayCheckedAt DateTime?
+  // Money-safety: when the gateway proves money arrived but the order cannot
+  // be fulfilled (cancelled after capture, duplicate capture), the payment is
+  // flagged REFUND_DUE and the customer is asked for their UPI ID here.
+  refundVpa String?
+  refundUtr String?
 
   verifications PaymentVerification[]
 

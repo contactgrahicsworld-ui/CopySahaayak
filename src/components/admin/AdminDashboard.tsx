@@ -283,6 +283,8 @@ const ORDER_STATUS_STYLES: Record<string, string> = {
   COMPLETED: 'bg-green-100 text-green-900',
   CANCELLED: 'bg-red-100 text-red-900',
   REJECTED: 'bg-red-100 text-red-900',
+  REFUND_DUE: 'bg-amber-100 text-amber-900',
+  REFUNDED: 'bg-green-100 text-green-900',
 }
 
 function OrdersTab() {
@@ -464,6 +466,8 @@ interface PaymentRow {
   rejectionReason?: string
   submittedAt?: string
   verifiedVia?: string
+  refundVpa?: string | null
+  refundUtr?: string | null
   order: { orderNumber: string; totalPaise: number; customerName?: string; customerPhone?: string }
 }
 
@@ -474,6 +478,8 @@ function PaymentsTab() {
   const [verify, setVerify] = useState<{ p: PaymentRow; action: 'VERIFY' | 'REJECT' } | null>(null)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  // Money-safety refund card state (REFUND_DUE rows).
+  const [refund, setRefund] = useState<{ p: PaymentRow; utr: string } | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/admin/payments?status=${status}`, { cache: 'no-store' })
@@ -486,6 +492,27 @@ function PaymentsTab() {
     const t = setInterval(load, 10000)
     return () => clearInterval(t)
   }, [load])
+
+  async function submitRefund() {
+    if (!refund) return
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/admin/payments/${refund.p.id}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refundUtr: refund.utr.trim() || undefined, refundVpa: refund.p.refundVpa || undefined }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast({ title: 'Refunded mark ho gaya', description: 'Customer ko tracker me REFUNDED dikhega.' })
+      setRefund(null)
+      load()
+    } catch (err) {
+      toast({ title: 'Failed', description: err instanceof Error ? err.message : 'Try again', variant: 'destructive' })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function submit() {
     if (!verify) return
@@ -515,7 +542,7 @@ function PaymentsTab() {
         <Select value={status} onValueChange={setStatus}>
           <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {['ACTION', 'PENDING', 'SUBMITTED', 'VERIFIED', 'REJECTED', 'ALL'].map((s) => (
+            {['ACTION', 'PENDING', 'SUBMITTED', 'VERIFIED', 'REJECTED', 'REFUND_DUE', 'REFUNDED', 'ALL'].map((s) => (
               <SelectItem key={s} value={s}>{s === 'ACTION' ? 'ACTION (जो अभी करने हैं)' : s}</SelectItem>
             ))}
           </SelectContent>
@@ -543,6 +570,12 @@ function PaymentsTab() {
                   {p.verifiedVia === 'GATEWAY' && (
                     <p className="text-xs text-emerald-700 flex items-center gap-1"><Wallet className="h-3 w-3" aria-hidden /> Gateway ne auto-verify kiya — koi action nahi</p>
                   )}
+                  {p.status === 'REFUND_DUE' && (
+                    <p className="text-xs text-amber-700">Paisa aa gaya tha par order cancel/duplicate hua — customer ko wapas karein.{p.refundVpa ? ` Customer UPI: ${p.refundVpa}` : ' Customer abhi apni UPI ID nahi bheja (tracker par maang rahe hain).'}</p>
+                  )}
+                  {p.status === 'REFUNDED' && (
+                    <p className="text-xs text-green-700">Refund ho gaya{p.refundUtr ? ` — UTR ${p.refundUtr}` : ''}</p>
+                  )}
                   {p.rejectionReason && <p className="text-xs text-red-600">{p.rejectionReason}</p>}
                 </div>
                 <div className="flex items-center gap-2">
@@ -557,12 +590,53 @@ function PaymentsTab() {
                       </Button>
                     </>
                   )}
+                  {p.status === 'REFUND_DUE' && (
+                    <Button size="sm" variant="outline" className="text-amber-700 border-amber-300" onClick={() => setRefund({ p, utr: '' })}>
+                      <IndianRupee className="h-4 w-4 mr-1" aria-hidden />Refund bheja — mark karein
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <Dialog open={!!refund} onOpenChange={(v) => !v && setRefund(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refund mark karein / Mark refund sent</DialogTitle>
+            <DialogDescription>
+              {refund?.p.order.orderNumber} · {refund ? formatInr(refund.p.amountPaise) : ''}
+              {refund?.p.refundVpa ? ` → ${refund.p.refundVpa}` : ''}. Apne UPI app se customer ke UPI ID par paisa wapas bhejein, phir refund ka UTR/reference neeche daal kar mark karein. Customer ko tracker me REFUNDED dikhega.
+            </DialogDescription>
+          </DialogHeader>
+          {refund?.p.refundVpa && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const amount = (refund.p.amountPaise / 100).toFixed(2)
+                  window.location.href = `upi://pay?pa=${encodeURIComponent(refund.p.refundVpa || '')}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Refund ${refund.p.order.orderNumber}`)}`
+                }}
+              >
+                <IndianRupee className="h-4 w-4 mr-1" aria-hidden />UPI app me refund kholen (one-tap)
+              </Button>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="rutr" className="text-sm">Refund UTR / reference (optional)</Label>
+            <Input id="rutr" value={refund?.utr || ''} onChange={(e) => setRefund((r) => (r ? { ...r, utr: e.target.value } : r))} placeholder="UPI transaction reference" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefund(null)}>Cancel</Button>
+            <Button onClick={submitRefund} disabled={busy}>
+              {busy && <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden />}Refunded mark karein
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!verify} onOpenChange={(v) => !v && setVerify(null)}>
         <DialogContent>
