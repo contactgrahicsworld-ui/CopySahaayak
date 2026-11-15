@@ -34,12 +34,12 @@ export async function POST(req: Request) {
       if (mailTransport === 'supabase') {
         const mirror = await ensureSupabaseAuthUser(email)
         if (!mirror) {
-          return jsonError(502, 'Password reset email is temporarily unavailable. Use the Operator recovery (reset key) below — no email needed.')
+          return jsonError(502, 'Password reset email is temporarily unavailable. Please try again in a few minutes.')
         }
         const result = await sendLoginOtp(email)
         if (!result.sent) {
           const waitMin = Math.max(1, Math.ceil((result.retryAfterSec || 300) / 60))
-          return jsonError(429, `Reset email limit reached (free-tier mailer). Try again in about ${waitMin} minute${waitMin > 1 ? 's' : ''} — or use the Operator recovery (reset key) below, no email needed.`)
+          return jsonError(429, `Reset email limit reached (free-tier mailer). Try again in about ${waitMin} minute${waitMin > 1 ? 's' : ''}.`)
         }
       } else if (mailTransport === 'smtp' || mailTransport === 'resend' || mailTransport === 'mock') {
         const code = generateOtp()
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       } else {
         return jsonError(
           503,
-          'Password reset email is not configured on this deployment yet. Use the Operator recovery (reset key) below — no email needed.'
+          'Password reset email is not configured on this deployment yet. Set SMTP_HOST/SMTP_USER/SMTP_PASS (recommended) or RESEND_API_KEY.'
         )
       }
 

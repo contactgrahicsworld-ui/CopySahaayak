@@ -1,7 +1,7 @@
 // Forgot password step 2: verify the emailed 6-digit code, then update the app
 // password (bcrypt) and revoke every existing session. Verification path matches
 // the transport used at step 1 (Supabase verify API, or the hashed app-OTP table
-// for SMTP/Resend/mock — including the operator reset-key recovery code).
+// for SMTP/Resend/mock).
 import { db } from '@/lib/db'
 import { handleRoute, jsonOk, jsonError } from '@/lib/api'
 import { resetPasswordSchema } from '@/lib/validation'
@@ -54,10 +54,9 @@ export async function POST(req: Request) {
         } catch {
           serviceDown = true
         }
-        // Fallback: app-issued codes (WhatsApp-delivered or the operator
-        // reset-key recovery) when the emailed code did not match — EVEN while
-        // Supabase is unreachable, so break-glass recovery never depends on
-        // Supabase uptime.
+        // Fallback: app-issued codes (e.g. WhatsApp-delivered) when the
+        // emailed code did not match — EVEN while Supabase is unreachable,
+        // so password recovery never depends on Supabase uptime.
         if (!codeOk) {
           codeOk = await verifyAppOtp(email, body.code).catch(() => false)
           if (codeOk) serviceDown = false
@@ -67,7 +66,7 @@ export async function POST(req: Request) {
       } else {
         return jsonError(
           503,
-          'Password reset email is not configured on this deployment yet. Set SMTP_HOST/SMTP_USER/SMTP_PASS (recommended) or RESEND_API_KEY — or use the Operator recovery (reset key) on the forgot-password page.'
+          'Password reset email is not configured on this deployment yet. Set SMTP_HOST/SMTP_USER/SMTP_PASS (recommended) or RESEND_API_KEY.'
         )
       }
       if (serviceDown) return jsonError(502, 'Password reset is temporarily unavailable. Please try again in a few minutes.')
