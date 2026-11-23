@@ -94,3 +94,9 @@ prisma/*.pg-backup
 .token-response
 .no-deploy-*
 .device-code-pending
+
+# firebase (second deployment — secrets never commit)
+.firebase/
+.firebase-token
+firebase-debug.log*
+*.debug.log

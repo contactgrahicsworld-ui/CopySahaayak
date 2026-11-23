@@ -1,0 +1,73 @@
+# Firebase App Hosting backend config — CopySahaayak (SECOND deployment).
+# Ye Vercel production se bilkul alag hai; dono parallel chalenge.
+#
+# No real values here — every variable is backed by Google Secret Manager
+# (created via `firebase apphosting:secrets:set`, automated in
+# scripts/deploy-firebase.sh from the production env pull).
+runConfig:
+  minInstances: 0
+  maxInstances: 4
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 1024
+
+env:
+  # Public client-side vars — needed at BUILD (inlined into the client bundle).
+  - variable: NEXT_PUBLIC_SUPABASE_URL
+    secret: cs-next-public-supabase-url
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_SUPABASE_ANON_KEY
+    secret: cs-next-public-supabase-anon-key
+    availability: [BUILD, RUNTIME]
+
+  # Database — needed at BUILD too: `npm run build` runs `prisma db push`.
+  - variable: DATABASE_URL
+    secret: cs-database-url
+    availability: [BUILD, RUNTIME]
+  - variable: DIRECT_URL
+    secret: cs-direct-url
+    availability: [BUILD, RUNTIME]
+
+  # Core app secrets (runtime).
+  - variable: APP_SECRET
+    secret: cs-app-secret
+    availability: [RUNTIME]
+  - variable: CRON_SECRET
+    secret: cs-cron-secret
+    availability: [RUNTIME]
+  - variable: MAIL_FROM
+    secret: cs-mail-from
+    availability: [RUNTIME]
+
+  # SMTP (email OTP password recovery — mandatory channel).
+  - variable: SMTP_HOST
+    secret: cs-smtp-host
+    availability: [RUNTIME]
+  - variable: SMTP_PORT
+    secret: cs-smtp-port
+    availability: [RUNTIME]
+  - variable: SMTP_USER
+    secret: cs-smtp-user
+    availability: [RUNTIME]
+  - variable: SMTP_PASS
+    secret: cs-smtp-pass
+    availability: [RUNTIME]
+
+  # Storage (Supabase).
+  - variable: STORAGE_DRIVER
+    secret: cs-storage-driver
+    availability: [RUNTIME]
+  - variable: SUPABASE_URL
+    secret: cs-supabase-url
+    availability: [RUNTIME]
+  - variable: SUPABASE_SERVICE_ROLE_KEY
+    secret: cs-supabase-service-role-key
+    availability: [RUNTIME]
+  - variable: SUPABASE_STORAGE_BUCKET
+    secret: cs-supabase-storage-bucket
+    availability: [RUNTIME]
+
+  # Break-glass super-admin setup recovery key.
+  - variable: SUPER_SETUP_RESET_KEY
+    secret: cs-super-setup-reset-key
+    availability: [RUNTIME]

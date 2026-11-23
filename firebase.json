@@ -1,0 +1,26 @@
+{
+  "apphosting": {
+    "backendId": "copysahaayak",
+    "rootDir": ".",
+    "ignore": [
+      "node_modules",
+      ".git",
+      ".next",
+      ".vercel",
+      ".firebase",
+      "scripts",
+      "tests",
+      "docs",
+      "connector",
+      "tool-results",
+      "db",
+      "private-data",
+      "*.md",
+      "*.log",
+      ".env*",
+      ".vercel-token",
+      ".firebase-token",
+      "prisma/*.pg-backup"
+    ]
+  }
+}
